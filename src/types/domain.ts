@@ -375,6 +375,26 @@ export type DashboardActivityItem = {
   type: "automation" | "audit";
 };
 
+export type AutomationLogStatus =
+  | "success"
+  | "failed"
+  | "pending"
+  | "skipped"
+  | "retrying";
+
+export type AutomationLog = {
+  automation_type: string;
+  created_at: string;
+  error_message: string | null;
+  id: string;
+  message: string;
+  payload: Record<string, unknown> | null;
+  related_id: string | null;
+  related_type: string;
+  status: AutomationLogStatus;
+  workspace_id: string;
+};
+
 export type DashboardOverview = {
   agendaItems: DashboardAgendaItem[];
   kpis: DashboardKpis;

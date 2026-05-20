@@ -9,6 +9,7 @@ import {
   getDateTimeRangeError,
   type DateTimeRangeValue,
 } from "@/components/ui/DateTimeRangePicker";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 
 type AddJobDialogProps = {
@@ -62,6 +63,7 @@ export function AddJobDialog({
 
     if (nextScheduleError) {
       setScheduleError(nextScheduleError);
+      notify.warning("Check the job schedule", nextScheduleError);
       return;
     }
 
@@ -97,20 +99,25 @@ export function AddJobDialog({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not create the job. Please try again.");
+        const errorMessage =
+          message ?? "We could not create the job. Please try again.";
+        setError(errorMessage);
+        notify.error("Job could not be added", errorMessage);
         return;
       }
 
       formRef.current?.reset();
       setSchedule({ end: null, start: null });
       setIsOpen(false);
+      notify.success("Job added", "The job was added to the board.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not create the job. Please try again.",
-      );
+          : "We could not create the job. Please try again.";
+      setError(errorMessage);
+      notify.error("Job could not be added", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

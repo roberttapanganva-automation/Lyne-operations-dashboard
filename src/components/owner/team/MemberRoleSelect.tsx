@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getAssignableRoles } from "@/lib/permissions/workspace";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { AssignableWorkspaceRole, WorkspaceRole } from "@/types/domain";
 
@@ -37,15 +38,20 @@ export function MemberRoleSelect({
       const result = (await response.json()) as ApiResponse<{ id: string }>;
 
       if (!response.ok || !result.ok) {
-        setMessage(result.ok ? "Role update failed." : result.error.message);
+        const message = result.ok ? "Role update failed." : result.error.message;
+        setMessage(message);
+        notify.error("Role could not be updated", message);
         setValue(role);
         return;
       }
 
       setMessage("Saved");
+      notify.success("Changes saved", "Member role updated.");
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Role update failed.");
+      const message = error instanceof Error ? error.message : "Role update failed.";
+      setMessage(message);
+      notify.error("Role could not be updated", message);
       setValue(role);
     } finally {
       setIsSaving(false);

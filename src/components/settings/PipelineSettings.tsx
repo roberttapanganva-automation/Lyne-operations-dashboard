@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { PipelineStage } from "@/types/domain";
 
@@ -304,7 +305,9 @@ export function PipelineSettings({
     const message = getErrorMessage(result);
 
     if (!response.ok || message) {
-      setError(message ?? "We could not create the stage.");
+      const errorMessage = message ?? "We could not create the stage.";
+      setError(errorMessage);
+      notify.error("Stage could not be created", errorMessage);
       return false;
     }
 
@@ -315,6 +318,7 @@ export function PipelineSettings({
         ),
       );
       setSuccess("Pipeline stage created.");
+      notify.success("Pipeline saved", "Pipeline stages were updated.");
       router.refresh();
       return true;
     }
@@ -337,7 +341,9 @@ export function PipelineSettings({
     const message = getErrorMessage(result);
 
     if (!response.ok || message) {
-      setError(message ?? "We could not update the stage.");
+      const errorMessage = message ?? "We could not update the stage.";
+      setError(errorMessage);
+      notify.error("Stage could not be saved", errorMessage);
       return;
     }
 
@@ -348,6 +354,7 @@ export function PipelineSettings({
           .sort((first, second) => first.order_index - second.order_index),
       );
       setSuccess("Pipeline stage updated.");
+      notify.success("Pipeline saved", "Pipeline stages were updated.");
       router.refresh();
     }
   }
@@ -363,7 +370,9 @@ export function PipelineSettings({
     const message = result.ok ? null : result.error.message;
 
     if (!response.ok || message) {
-      setError(message ?? "We could not delete the stage.");
+      const errorMessage = message ?? "We could not delete the stage.";
+      setError(errorMessage);
+      notify.error("Stage could not be deleted", errorMessage);
       return;
     }
 
@@ -371,6 +380,7 @@ export function PipelineSettings({
       current.filter((stage) => stage.id !== stageId),
     );
     setSuccess("Pipeline stage deleted.");
+    notify.success("Stage deleted", "The pipeline stage was removed.");
     router.refresh();
   }
 

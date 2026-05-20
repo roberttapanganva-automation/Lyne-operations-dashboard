@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { CurrentAccountSummary } from "@/lib/account/queries";
 import { useState } from "react";
 import { getBrandingCssVars } from "@/lib/branding/cssVars";
 import type { ActiveWorkspaceContext } from "@/types/domain";
@@ -9,12 +10,14 @@ import { Sidebar } from "./Sidebar";
 
 type AppShellChromeProps = {
   children: ReactNode;
+  currentAccount: Promise<CurrentAccountSummary | null>;
   topbar: ReactNode;
   workspaceContext: ActiveWorkspaceContext;
 };
 
 export function AppShellChrome({
   children,
+  currentAccount,
   topbar,
   workspaceContext,
 }: AppShellChromeProps) {
@@ -32,6 +35,7 @@ export function AppShellChrome({
       >
         <Sidebar
           collapsed={sidebarCollapsed}
+          currentAccount={currentAccount}
           onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
           workspaceContext={workspaceContext}
         />

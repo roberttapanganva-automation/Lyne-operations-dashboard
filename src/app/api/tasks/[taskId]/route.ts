@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import {
   canDeleteOperationalRecords,
-  canViewWorkspace,
+  canEditOperationalRecords,
 } from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
@@ -97,7 +97,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  if (!canViewWorkspace(activeWorkspace.context.role)) {
+  if (!canEditOperationalRecords(activeWorkspace.context.role)) {
     return jsonResponse(
       {
         error: {

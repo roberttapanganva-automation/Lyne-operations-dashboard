@@ -1,29 +1,50 @@
 "use client";
 
-import { UserCircleIcon } from "@phosphor-icons/react";
+import Link from "next/link";
+import { AccountAvatar } from "@/components/account/AccountAvatar";
+import type { CurrentAccountSummary } from "@/lib/account/queries";
 type UserMenuProps = {
+  account: CurrentAccountSummary | null;
   compact?: boolean;
 };
 
-export function UserMenu({ compact = false }: UserMenuProps) {
+export function UserMenu({ account, compact = false }: UserMenuProps) {
   if (compact) {
-    return null;
+    return (
+      <Link
+        aria-label="Account"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[var(--ops-sidebar-soft)] transition hover:bg-[var(--ops-sidebar-card)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+        href="/account"
+        title={account?.displayName ?? "Account"}
+      >
+        <AccountAvatar
+          avatarUrl={account?.avatarUrl}
+          className="text-[var(--ops-white)]"
+          email={account?.email}
+          fullName={account?.fullName}
+          size="sm"
+        />
+      </Link>
+    );
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[var(--ops-sidebar-soft)] p-4">
+    <Link
+      className="block rounded-xl border border-white/10 bg-[var(--ops-sidebar-soft)] p-4 transition hover:bg-[var(--ops-sidebar-card)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+      href="/account"
+    >
       <div className="flex items-center gap-3">
-        <div
-          aria-label="User avatar placeholder"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--ops-primary)] text-[var(--ops-white)]"
-          role="img"
-        >
-          <UserCircleIcon aria-hidden="true" size={20} weight="duotone" />
-        </div>
+        <AccountAvatar
+          avatarUrl={account?.avatarUrl}
+          className="text-[var(--ops-white)]"
+          email={account?.email}
+          fullName={account?.fullName}
+          size="sm"
+        />
         <div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold text-[var(--ops-white)]">
-              Account
+              {account?.displayName ?? "Account"}
             </p>
             <span
               aria-label="Active"
@@ -31,9 +52,11 @@ export function UserMenu({ compact = false }: UserMenuProps) {
               title="Active"
             />
           </div>
-          <p className="mt-0.5 text-xs text-white/55">Profile loads later.</p>
+          <p className="mt-0.5 text-xs text-white/55">
+            {account?.email ?? "Open personal account settings."}
+          </p>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

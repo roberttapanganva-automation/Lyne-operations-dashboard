@@ -21,6 +21,7 @@ export type AuditActivityLog = {
   entity_type: string;
   id: string;
   metadata: Record<string, unknown> | null;
+  workspace_id?: string | null;
 };
 
 type AuditActivityLookups = {
@@ -55,7 +56,7 @@ function actorLabel(actorUserId: string | null, lookups: AuditActivityLookups) {
     return "System";
   }
 
-  return lookups.actorNames.get(actorUserId) ?? "Workspace member";
+  return lookups.actorNames.get(actorUserId) ?? "Unknown workspace user";
 }
 
 function recordLabel(log: AuditActivityLog, lookups: AuditActivityLookups) {
@@ -138,11 +139,98 @@ async function loadNameMap(
   );
 }
 
+function labelFromEmail(email: string | null | undefined) {
+  if (!email) {
+    return null;
+  }
+
+  const label = email.split("@")[0]?.replace(/[._-]+/g, " ").trim();
+
+  return label || email;
+}
+
+function titleCaseRole(role: string | null | undefined) {
+  if (!role) {
+    return null;
+  }
+
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+async function loadActorNames(
+  supabase: SupabaseServerClient,
+  logs: AuditActivityLog[],
+) {
+  const actorIds = collectUniqueIds(logs, (log) => log.actor_user_id);
+
+  if (actorIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const workspaceIds = collectUniqueIds(logs, (log) => log.workspace_id ?? null);
+  const profileNames = await loadNameMap(
+    supabase
+      .from("profiles")
+      .select("id,full_name")
+      .in("id", actorIds)
+      .returns<Array<{ full_name: string | null; id: string }>>(),
+    (row) => row.full_name,
+  );
+
+  const actorNames = new Map(profileNames);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user && actorIds.includes(user.id) && !actorNames.has(user.id)) {
+    const metadataName =
+      typeof user.user_metadata?.full_name === "string"
+        ? user.user_metadata.full_name.trim()
+        : null;
+    const currentUserLabel = metadataName || labelFromEmail(user.email);
+
+    if (currentUserLabel) {
+      actorNames.set(user.id, currentUserLabel);
+    }
+  }
+
+  let memberQuery = supabase
+    .from("workspace_members")
+    .select("user_id,invited_email,role")
+    .in("user_id", actorIds);
+
+  if (workspaceIds.length > 0) {
+    memberQuery = memberQuery.in("workspace_id", workspaceIds);
+  }
+
+  const { data: members } = await memberQuery.returns<
+    Array<{
+      invited_email: string | null;
+      role: string | null;
+      user_id: string;
+    }>
+  >();
+
+  for (const member of members ?? []) {
+    if (actorNames.has(member.user_id)) {
+      continue;
+    }
+
+    const memberLabel =
+      labelFromEmail(member.invited_email) ?? titleCaseRole(member.role);
+
+    if (memberLabel) {
+      actorNames.set(member.user_id, memberLabel);
+    }
+  }
+
+  return actorNames;
+}
+
 export async function buildAuditActivityLookups(
   supabase: SupabaseServerClient,
   logs: AuditActivityLog[],
 ): Promise<AuditActivityLookups> {
-  const actorIds = collectUniqueIds(logs, (log) => log.actor_user_id);
   const leadIds = collectUniqueIds(logs, (log) =>
     log.entity_type === "lead" ? log.entity_id : null,
   );
@@ -184,16 +272,7 @@ export async function buildAuditActivityLookups(
     pipelineGroupNames,
     pipelineStageNames,
   ] = await Promise.all([
-    actorIds.length > 0
-      ? loadNameMap(
-          supabase
-            .from("profiles")
-            .select("id,full_name")
-            .in("id", actorIds)
-            .returns<Array<{ full_name: string | null; id: string }>>(),
-          (row) => row.full_name,
-        )
-      : Promise.resolve(new Map<string, string>()),
+    loadActorNames(supabase, logs),
     leadIds.length > 0
       ? loadNameMap(
           supabase

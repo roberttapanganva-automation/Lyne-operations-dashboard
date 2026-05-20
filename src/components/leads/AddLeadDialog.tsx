@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { notify } from "@/lib/ui/toast";
 import type { LeadPipelineStageOption } from "@/lib/pipelines/queries";
 import type { ApiResponse } from "@/types/api";
 import type { Client } from "@/types/domain";
@@ -106,7 +107,10 @@ export function AddLeadDialog({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not create the lead. Please try again.");
+        const errorMessage =
+          message ?? "We could not create the lead. Please try again.";
+        setError(errorMessage);
+        notify.error("Lead could not be added", errorMessage);
         return;
       }
 
@@ -114,13 +118,15 @@ export function AddLeadDialog({
       setNextFollowUpDate(undefined);
       setSelectedClientId("");
       setIsOpen(false);
+      notify.success("Lead added", "The lead was added to your CRM.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not create the lead. Please try again.",
-      );
+          : "We could not create the lead. Please try again.";
+      setError(errorMessage);
+      notify.error("Lead could not be added", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

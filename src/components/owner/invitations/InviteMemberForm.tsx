@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { getAssignableRoles } from "@/lib/permissions/workspace";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { WorkspaceInvitation } from "@/types/domain";
 
@@ -51,7 +52,9 @@ export function InviteMemberForm() {
       const result = (await response.json()) as ApiResponse<WorkspaceInvitation>;
 
       if (!response.ok || !result.ok) {
-        setError(result.ok ? "Invite creation failed." : result.error.message);
+        const message = result.ok ? "Invite creation failed." : result.error.message;
+        setError(message);
+        notify.error("Invite could not be created", message);
         return;
       }
 
@@ -59,13 +62,15 @@ export function InviteMemberForm() {
       setExpiresDate(undefined);
       setSuccess("Pending invite created. Copy the invite link and send it manually for now.");
       setInviteLink(`${window.location.origin}/invite/${result.data.id}`);
+      notify.success("Created successfully", "Pending invite created.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "Invite creation failed.",
-      );
+          : "Invite creation failed.";
+      setError(message);
+      notify.error("Invite could not be created", message);
     } finally {
       setIsSubmitting(false);
     }

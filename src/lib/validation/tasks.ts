@@ -59,6 +59,12 @@ export const updateTaskSchema = z
     message: "Provide at least one task field to update.",
   });
 
+export const bulkTaskActionSchema = z.object({
+  action: z.literal("delete"),
+  ids: z.array(z.uuid()).min(1).max(100),
+});
+
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+export type BulkTaskActionInput = z.infer<typeof bulkTaskActionSchema>;
 export type TaskStatusInput = z.infer<typeof taskStatusSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;

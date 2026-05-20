@@ -58,5 +58,29 @@ export const updateLeadSchema = z.object({
   title: z.string().trim().min(1, "Lead title is required."),
 });
 
+export const importLeadRowSchema = z.object({
+  contact_name: optionalText,
+  email: optionalEmail,
+  estimated_value: optionalNumber.default(0),
+  next_follow_up_at: optionalDateTime,
+  notes: optionalText,
+  phone: optionalText,
+  priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
+  source: optionalText.default("csv"),
+  status: z.enum(["open", "won", "lost"]).default("open"),
+  title: z.string().trim().min(1, "Lead title is required."),
+});
+
+export const importLeadsSchema = z.object({
+  rows: z.array(importLeadRowSchema).min(1).max(200),
+});
+
+export const bulkLeadActionSchema = z.object({
+  action: z.literal("delete"),
+  ids: z.array(z.uuid()).min(1).max(200),
+});
+
+export type BulkLeadActionInput = z.infer<typeof bulkLeadActionSchema>;
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
+export type ImportLeadRowInput = z.infer<typeof importLeadRowSchema>;
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;

@@ -56,6 +56,7 @@ type AuditLogRow = {
   entity_type: string;
   id: string;
   metadata: Record<string, unknown> | null;
+  workspace_id: string;
 };
 
 function startOfLocalDay(value: Date) {
@@ -296,7 +297,7 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
       .returns<AutomationLogRow[]>(),
     supabase
       .from("audit_logs")
-      .select("id,action,actor_user_id,entity_id,entity_type,metadata,created_at")
+      .select("id,workspace_id,action,actor_user_id,entity_id,entity_type,metadata,created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(8)

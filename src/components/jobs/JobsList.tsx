@@ -1,6 +1,12 @@
-import { Card } from "@/components/ui/Card";
+"use client";
+
+import { useRouter } from "next/navigation";
+import type { ApiResponse } from "@/types/api";
+import { useEffect, useState } from "react";
+import { BulkActionBar } from "@/components/ui/BulkActionBar";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { DateTimeCell, DateTimeHeader } from "@/components/ui/DateTimeCell";
-import { DeleteRecordButton } from "@/components/records/DeleteRecordButton";
+import { notify } from "@/lib/ui/toast";
 import { EditJobDialog } from "./EditJobDialog";
 import { JobStatusBadge, type JobStatus } from "./JobStatusBadge";
 import { JobsEmptyState } from "./JobsEmptyState";
@@ -33,6 +39,14 @@ type JobsListProps = {
   jobs: JobListItem[];
 };
 
+type BulkDeleteResponse = {
+  deleted: Array<{
+    id: string;
+    title: string;
+  }>;
+  deletedCount: number;
+};
+
 function formatCreatedDate(value: string) {
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
@@ -52,26 +66,151 @@ export function JobsList({
   canDeleteRecords,
   jobs,
 }: JobsListProps) {
-  if (jobs.length === 0) {
+  const router = useRouter();
+  const [editingJob, setEditingJob] = useState<JobListItem | null>(null);
+  const [visibleJobs, setVisibleJobs] = useState(jobs);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
+  const [bulkDeleteSuccess, setBulkDeleteSuccess] = useState<string | null>(null);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+  useEffect(() => {
+    setVisibleJobs(jobs);
+  }, [jobs]);
+
+  if (visibleJobs.length === 0) {
     return <JobsEmptyState canCreateRecords={canCreateRecords} />;
   }
-  const showActions = canCreateRecords || canDeleteRecords;
+
+  const allSelected =
+    visibleJobs.length > 0 &&
+    visibleJobs.every((job) => selectedIds.includes(job.id));
+
+  function openJobEditor(job: JobListItem) {
+    if (!canCreateRecords) {
+      return;
+    }
+
+    setEditingJob(job);
+  }
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds([]);
+      return;
+    }
+
+    setSelectedIds(visibleJobs.map((job) => job.id));
+  }
+
+  function toggleJobSelection(jobId: string) {
+    setSelectedIds((current) =>
+      current.includes(jobId)
+        ? current.filter((selectedId) => selectedId !== jobId)
+        : [...current, jobId],
+    );
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+    setBulkDeleteError(null);
+  }
+
+  async function deleteSelectedJobs() {
+    setBulkDeleteError(null);
+    setBulkDeleteSuccess(null);
+    setIsBulkDeleting(true);
+
+    try {
+      const response = await fetch("/api/jobs/bulk", {
+        body: JSON.stringify({
+          action: "delete",
+          ids: selectedIds,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const result = (await response.json()) as ApiResponse<BulkDeleteResponse>;
+
+      if (!response.ok || !result.ok) {
+        const errorMessage =
+          result.ok
+            ? "We could not delete the selected jobs."
+            : result.error.message;
+        setBulkDeleteError(errorMessage);
+        notify.error("Job delete failed", errorMessage);
+        return;
+      }
+
+      const deletedIds = new Set(result.data.deleted.map((job) => job.id));
+      setVisibleJobs((current) =>
+        current.filter((job) => !deletedIds.has(job.id)),
+      );
+      setBulkDeleteSuccess(
+        result.data.deletedCount === 1
+          ? "Job deleted successfully."
+          : `${result.data.deletedCount} jobs deleted successfully.`,
+      );
+      notify.success(
+        result.data.deletedCount === 1 ? "Job deleted" : "Jobs deleted",
+        result.data.deletedCount === 1
+          ? "The selected job was removed."
+          : "The selected jobs were removed.",
+      );
+      clearSelection();
+      setBulkDeleteOpen(false);
+      router.refresh();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "We could not delete the selected jobs.";
+      setBulkDeleteError(errorMessage);
+      notify.error("Job delete failed", errorMessage);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
 
   return (
-    <Card className="overflow-hidden">
-      <div className="border-b border-[var(--ops-border)] px-5 py-4 sm:px-6">
-        <h2 className="text-base font-semibold text-[var(--ops-text)]">
-          Job queue
-        </h2>
-        <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
-          Review upcoming service work, delivery status, and billing progress without leaving the queue.
-        </p>
+    <>
+      <div className="space-y-3">
+        <BulkActionBar
+          canDelete={canDeleteRecords}
+          canEdit={false}
+          entityLabel="job"
+          onClearSelection={clearSelection}
+          onDelete={() => setBulkDeleteOpen(true)}
+          selectedCount={selectedIds.length}
+        />
+        {bulkDeleteError ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--ops-danger)]">
+            {bulkDeleteError}
+          </p>
+        ) : null}
+        {bulkDeleteSuccess ? (
+          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            {bulkDeleteSuccess}
+          </p>
+        ) : null}
       </div>
 
       <div className="hidden overflow-x-auto xl:block">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--ops-card-soft)] text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
             <tr>
+              <th className="px-5 py-3 sm:px-6" scope="col">
+                <input
+                  aria-label="Select all jobs"
+                  checked={allSelected}
+                  className="h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                  onChange={toggleSelectAll}
+                  type="checkbox"
+                />
+              </th>
               <th className="px-5 py-3 sm:px-6" scope="col">
                 Job
               </th>
@@ -93,16 +232,27 @@ export function JobsList({
               <th className="px-5 py-3" scope="col">
                 Created
               </th>
-              {showActions ? (
-                <th className="px-5 py-3 text-right" scope="col">
-                  Action
-                </th>
-              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--ops-border)] bg-white">
-            {jobs.map((job) => (
-              <tr key={job.id}>
+            {visibleJobs.map((job) => (
+              <tr
+                className={canCreateRecords ? "cursor-pointer transition hover:bg-[var(--ops-card-soft)]" : ""}
+                key={job.id}
+                onDoubleClick={() => openJobEditor(job)}
+                title={canCreateRecords ? "Double-click to edit job" : undefined}
+              >
+                <td className="px-5 py-4 sm:px-6">
+                  <input
+                    aria-label={`Select ${job.title}`}
+                    checked={selectedIds.includes(job.id)}
+                    className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                    onChange={() => toggleJobSelection(job.id)}
+                    onClick={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                    type="checkbox"
+                  />
+                </td>
                 <td className="px-5 py-4 sm:px-6">
                   <p className="font-medium text-[var(--ops-text)]">
                     {job.title}
@@ -130,19 +280,6 @@ export function JobsList({
                 <td className="px-5 py-4 text-[var(--ops-text-soft)]">
                   {formatCreatedDate(job.created_at)}
                 </td>
-                {showActions ? (
-                  <td className="px-5 py-4">
-                    <div className="flex justify-end gap-2">
-                      {canCreateRecords ? <EditJobDialog job={job} /> : null}
-                      {canDeleteRecords ? (
-                        <DeleteRecordButton
-                          endpoint={`/api/jobs/${job.id}`}
-                          label={`Delete job ${job.title}`}
-                        />
-                      ) : null}
-                    </div>
-                  </td>
-                ) : null}
               </tr>
             ))}
           </tbody>
@@ -150,8 +287,13 @@ export function JobsList({
       </div>
 
       <div className="divide-y divide-[var(--ops-border)] xl:hidden">
-        {jobs.map((job) => (
-          <article className="p-5" key={job.id}>
+        {visibleJobs.map((job) => (
+          <article
+            className={canCreateRecords ? "cursor-pointer p-5 transition hover:bg-[var(--ops-card-soft)]" : "p-5"}
+            key={job.id}
+            onDoubleClick={() => openJobEditor(job)}
+            title={canCreateRecords ? "Double-click to edit job" : undefined}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="font-semibold text-[var(--ops-text)]">
@@ -161,19 +303,19 @@ export function JobsList({
                   {job.service_type ?? "Service type not set"}
                 </p>
               </div>
-              <JobStatusBadge status={job.status} />
-            </div>
-            {showActions ? (
-              <div className="mt-4 flex justify-end gap-2">
-                {canCreateRecords ? <EditJobDialog job={job} /> : null}
-                {canDeleteRecords ? (
-                  <DeleteRecordButton
-                    endpoint={`/api/jobs/${job.id}`}
-                    label={`Delete job ${job.title}`}
-                  />
-                ) : null}
+              <div className="flex items-start gap-3">
+                <JobStatusBadge status={job.status} />
+                <input
+                  aria-label={`Select ${job.title}`}
+                  checked={selectedIds.includes(job.id)}
+                  className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                  onChange={() => toggleJobSelection(job.id)}
+                  onClick={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  type="checkbox"
+                />
               </div>
-            ) : null}
+            </div>
 
             <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <div>
@@ -212,6 +354,32 @@ export function JobsList({
           </article>
         ))}
       </div>
-    </Card>
+      {editingJob ? (
+        <EditJobDialog
+          hideTrigger
+          job={editingJob}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingJob(null);
+            }
+          }}
+          open
+        />
+      ) : null}
+      <ConfirmDeleteDialog
+        confirmLabel={selectedIds.length === 1 ? "Delete job" : "Delete jobs"}
+        description="This will permanently remove the selected job records from this workspace. Use this only for accidental or unwanted job records."
+        isSubmitting={isBulkDeleting}
+        itemCount={selectedIds.length}
+        onCancel={() => {
+          if (!isBulkDeleting) {
+            setBulkDeleteOpen(false);
+          }
+        }}
+        onConfirm={deleteSelectedJobs}
+        open={bulkDeleteOpen}
+        title="Delete selected jobs?"
+      />
+    </>
   );
 }

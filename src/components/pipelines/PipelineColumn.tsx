@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { formatCurrency } from "@/lib/formatting/currency";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { PipelineBoardStage } from "@/types/domain";
 import { PipelineCard } from "./PipelineCard";
@@ -86,7 +87,9 @@ export function PipelineColumn({
     try {
       payload = JSON.parse(rawPayload) as DragPayload;
     } catch {
-      setDropError("We could not read the dragged card.");
+      const message = "We could not read the dragged card.";
+      setDropError(message);
+      notify.warning("Card could not be moved", message);
       return;
     }
 
@@ -114,19 +117,26 @@ export function PipelineColumn({
       const result = (await response.json()) as ApiResponse<MoveResponse>;
 
       if (!response.ok || !result.ok) {
-        setDropError(
-          result.ok ? "We could not move the card." : result.error.message,
-        );
+        const message = result.ok
+          ? "We could not move the card."
+          : result.error.message;
+        setDropError(message);
+        notify.error("Pipeline update failed", message);
         return;
       }
 
+      notify.success(
+        "Pipeline updated",
+        "The lead was moved to the selected stage.",
+      );
       router.refresh();
     } catch (caughtError) {
-      setDropError(
+      const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not move the card.",
-      );
+          : "We could not move the card.";
+      setDropError(message);
+      notify.error("Pipeline update failed", message);
     } finally {
       setMovingCardId(null);
     }
@@ -164,31 +174,22 @@ export function PipelineColumn({
       </div>
 
       <div
-        className={`mt-2 flex-1 space-y-2 rounded-xl transition ${
+        className={`mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 rounded-xl transition ${
           dragOver ? "bg-[var(--workspace-primary-soft,var(--ops-primary-soft))]/60 p-1.5" : ""
         }`}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        {stage.cards.length === 0 ? (
-          <div
-            className="rounded-lg border border-[var(--ops-border)] bg-white/80 px-3 py-5 text-center shadow-sm"
-            style={{ boxShadow: `inset 0 0 0 1px ${hexToRgba(stage.color, 0.16)}` }}
-          >
-            <p className="text-sm font-medium text-[var(--ops-text)]">No cards yet</p>
-          </div>
-        ) : (
-          stage.cards.map((card) => (
-            <PipelineCard
-              canMoveCards={canMoveCards}
-              card={card}
-              currencyCode={currencyCode}
-              isMoving={movingCardId === card.id}
-              key={card.id}
-            />
-          ))
-        )}
+        {stage.cards.map((card) => (
+          <PipelineCard
+            canMoveCards={canMoveCards}
+            card={card}
+            currencyCode={currencyCode}
+            isMoving={movingCardId === card.id}
+            key={card.id}
+          />
+        ))}
         {dropError ? (
           <p className="text-xs leading-5 text-[var(--ops-danger)]">{dropError}</p>
         ) : null}

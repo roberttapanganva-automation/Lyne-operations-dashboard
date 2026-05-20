@@ -5,11 +5,15 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { LeadListItem } from "./LeadsList";
 
 type EditLeadDialogProps = {
+  hideTrigger?: boolean;
   lead: LeadListItem;
+  onOpenChange?: (open: boolean) => void;
+  open?: boolean;
 };
 
 type UpdatedLead = {
@@ -51,16 +55,31 @@ function getErrorMessage(response: ApiResponse<UpdatedLead>) {
   return response.error.message;
 }
 
-export function EditLeadDialog({ lead }: EditLeadDialogProps) {
+export function EditLeadDialog({
+  hideTrigger = false,
+  lead,
+  onOpenChange,
+  open,
+}: EditLeadDialogProps) {
   const router = useRouter();
   const initialFollowUp = splitDateTime(lead.next_follow_up_at);
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(
     initialFollowUp.date,
   );
   const [followUpTime, setFollowUpTime] = useState(initialFollowUp.time);
+  const isOpen = open ?? internalOpen;
+
+  function setDialogOpen(nextOpen: boolean) {
+    if (onOpenChange) {
+      onOpenChange(nextOpen);
+      return;
+    }
+
+    setInternalOpen(nextOpen);
+  }
 
   function closeDialog() {
     if (isSubmitting) {
@@ -68,7 +87,7 @@ export function EditLeadDialog({ lead }: EditLeadDialogProps) {
     }
 
     setError(null);
-    setIsOpen(false);
+    setDialogOpen(false);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -102,18 +121,23 @@ export function EditLeadDialog({ lead }: EditLeadDialogProps) {
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not update the lead. Please try again.");
+        const errorMessage =
+          message ?? "We could not update the lead. Please try again.";
+        setError(errorMessage);
+        notify.error("Lead could not be updated", errorMessage);
         return;
       }
 
-      setIsOpen(false);
+      setDialogOpen(false);
+      notify.success("Lead updated", "The lead details were saved.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not update the lead. Please try again.",
-      );
+          : "We could not update the lead. Please try again.";
+      setError(errorMessage);
+      notify.error("Lead could not be updated", errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -121,15 +145,17 @@ export function EditLeadDialog({ lead }: EditLeadDialogProps) {
 
   return (
     <>
-      <button
-        aria-label={`Edit lead ${lead.title}`}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--ops-border)] bg-white text-[var(--workspace-primary,var(--ops-primary-dark))] shadow-sm transition hover:bg-[var(--workspace-primary-soft,var(--ops-primary-soft))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--workspace-primary,var(--ops-primary))]"
-        onClick={() => setIsOpen(true)}
-        title="Edit lead"
-        type="button"
-      >
-        <PencilSimpleLineIcon aria-hidden="true" size={18} weight="regular" />
-      </button>
+      {hideTrigger ? null : (
+        <button
+          aria-label={`Edit lead ${lead.title}`}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--ops-border)] bg-white text-[var(--workspace-primary,var(--ops-primary-dark))] shadow-sm transition hover:bg-[var(--workspace-primary-soft,var(--ops-primary-soft))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--workspace-primary,var(--ops-primary))]"
+          onClick={() => setDialogOpen(true)}
+          title="Edit lead"
+          type="button"
+        >
+          <PencilSimpleLineIcon aria-hidden="true" size={18} weight="regular" />
+        </button>
+      )}
 
       {isOpen ? (
         <div

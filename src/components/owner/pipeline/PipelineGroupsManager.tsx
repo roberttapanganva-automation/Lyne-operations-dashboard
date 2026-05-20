@@ -7,6 +7,7 @@ import { PipelineStagesManager } from "@/components/owner/pipeline/PipelineStage
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { PipelineGroup, PipelineStage } from "@/types/domain";
 
@@ -322,7 +323,10 @@ export function PipelineGroupsManager({
     );
 
     if (duplicateGroup) {
-      setError("A pipeline group with this name already exists for that entity type.");
+      const message =
+        "A pipeline group with this name already exists for that entity type.";
+      setError(message);
+      notify.warning("Pipeline group already exists", message);
       setIsCreatingGroup(false);
       return;
     }
@@ -347,7 +351,11 @@ export function PipelineGroupsManager({
       );
 
       if (!response.ok || !result.ok) {
-        setError(result.ok ? "We could not create the pipeline group." : result.error.message);
+        const message = result.ok
+          ? "We could not create the pipeline group."
+          : result.error.message;
+        setError(message);
+        notify.error("Pipeline group could not be created", message);
         return;
       }
 
@@ -365,14 +373,15 @@ export function PipelineGroupsManager({
       );
       setNewGroupIsDefault(false);
       setIsCreateGroupOpen(false);
+      notify.success("Pipeline saved", "Pipeline stages were updated.");
       router.refresh();
     } catch (caughtError) {
-      setError(
-        getFriendlyPipelineErrorMessage(
-          "We could not create the pipeline group.",
-          caughtError,
-        ),
+      const message = getFriendlyPipelineErrorMessage(
+        "We could not create the pipeline group.",
+        caughtError,
       );
+      setError(message);
+      notify.error("Pipeline group could not be created", message);
     } finally {
       setIsCreatingGroup(false);
     }
@@ -404,12 +413,17 @@ export function PipelineGroupsManager({
     );
 
     if (!response.ok || !result.ok) {
-      setError(result.ok ? "We could not update the pipeline group." : result.error.message);
+      const message = result.ok
+        ? "We could not update the pipeline group."
+        : result.error.message;
+      setError(message);
+      notify.error("Pipeline group could not be saved", message);
       return;
     }
 
     setPipelineGroups((current) => normalizeGroups(current, result.data));
     setSuccess("Pipeline group updated.");
+    notify.success("Pipeline saved", "Pipeline stages were updated.");
     router.refresh();
   }
 
@@ -426,7 +440,11 @@ export function PipelineGroupsManager({
     );
 
     if (!response.ok || !result.ok) {
-      setError(result.ok ? "We could not delete the pipeline group." : result.error.message);
+      const message = result.ok
+        ? "We could not delete the pipeline group."
+        : result.error.message;
+      setError(message);
+      notify.error("Pipeline group could not be deleted", message);
       return;
     }
 
@@ -435,6 +453,7 @@ export function PipelineGroupsManager({
       current.filter((stage) => stage.pipeline_group_id !== groupId),
     );
     setSuccess("Pipeline group deleted.");
+    notify.success("Pipeline saved", "Pipeline stages were updated.");
     router.refresh();
   }
 
@@ -463,6 +482,7 @@ export function PipelineGroupsManager({
     if (duplicateStage) {
       const message = "A stage with this name already exists in the selected pipeline group.";
       setError(message);
+      notify.warning("Stage already exists", message);
       throw new Error(message);
     }
 
@@ -483,12 +503,14 @@ export function PipelineGroupsManager({
         ? "We could not create the stage."
         : result.error.message;
       setError(message);
+      notify.error("Stage could not be created", message);
       throw new Error(message);
     }
 
     setPipelineStages((current) => sortStages([...current, result.data]));
     setSelectedGroupId(group.id);
     setSuccess("Stage created.");
+    notify.success("Pipeline saved", "Pipeline stages were updated.");
     router.refresh();
   }
 
@@ -519,7 +541,11 @@ export function PipelineGroupsManager({
     );
 
     if (!response.ok || !result.ok) {
-      setError(result.ok ? "We could not update the stage." : result.error.message);
+      const message = result.ok
+        ? "We could not update the stage."
+        : result.error.message;
+      setError(message);
+      notify.error("Stage could not be saved", message);
       return;
     }
 
@@ -529,6 +555,7 @@ export function PipelineGroupsManager({
       ),
     );
     setSuccess("Stage updated.");
+    notify.success("Pipeline saved", "Pipeline stages were updated.");
     router.refresh();
   }
 
@@ -545,12 +572,17 @@ export function PipelineGroupsManager({
     );
 
     if (!response.ok || !result.ok) {
-      setError(result.ok ? "We could not delete the stage." : result.error.message);
+      const message = result.ok
+        ? "We could not delete the stage."
+        : result.error.message;
+      setError(message);
+      notify.error("Stage could not be deleted", message);
       return;
     }
 
     setPipelineStages((current) => current.filter((stage) => stage.id !== stageId));
     setSuccess("Stage deleted.");
+    notify.success("Stage deleted", "The pipeline stage was removed.");
     router.refresh();
   }
 

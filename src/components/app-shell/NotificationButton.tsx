@@ -47,6 +47,16 @@ function formatTime(value: string) {
   }).format(date);
 }
 
+function getNotificationTimestamp(item: NotificationItem) {
+  const timestamp = new Date(item.timestamp).getTime();
+
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getNotificationReadKey(item: NotificationItem) {
+  return `${item.id}:${item.timestamp}`;
+}
+
 function NotificationItemIcon({ icon }: { icon: ActivityIconKey }) {
   const className = "text-[var(--workspace-primary,var(--ops-primary-dark))]";
   const iconProps = { className, size: 18, weight: "duotone" as const };
@@ -105,14 +115,17 @@ export function NotificationButton({ items }: NotificationButtonProps) {
   const cutoffTimestamp =
     mountedAt - notificationLifetimeInDays * 24 * 60 * 60 * 1000;
   const visibleItems = items.filter((item) => {
-    const timestamp = new Date(item.timestamp).getTime();
+    const timestamp = getNotificationTimestamp(item);
 
-    return Number.isFinite(timestamp) && timestamp >= cutoffTimestamp;
+    return timestamp >= cutoffTimestamp;
   });
-  const unreadCount = visibleItems.filter((item) => {
-    const timestamp = new Date(item.timestamp).getTime();
-    return timestamp > readAllAt && !readIds.has(item.id);
-  }).length;
+  const unreadItems = visibleItems.filter((item) => {
+    const timestamp = getNotificationTimestamp(item);
+    const readKey = getNotificationReadKey(item);
+
+    return timestamp > readAllAt && !readIds.has(readKey) && !readIds.has(item.id);
+  });
+  const unreadCount = unreadItems.length;
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
@@ -159,11 +172,17 @@ export function NotificationButton({ items }: NotificationButtonProps) {
     }
 
     const latestTimestamp = visibleItems.reduce((latest, item) => {
-      const timestamp = new Date(item.timestamp).getTime();
-      return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+      const timestamp = getNotificationTimestamp(item);
+      return Math.max(latest, timestamp);
     }, readAllAt);
+    const nextReadIds = new Set(readIds);
 
-    persistReadIds(new Set([...readIds, ...visibleItems.map((item) => item.id)]));
+    visibleItems.forEach((item) => {
+      nextReadIds.add(item.id);
+      nextReadIds.add(getNotificationReadKey(item));
+    });
+
+    persistReadIds(nextReadIds);
     persistReadAllAt(latestTimestamp);
   }
 
@@ -174,14 +193,18 @@ export function NotificationButton({ items }: NotificationButtonProps) {
       return;
     }
 
-    const timestamp = new Date(notification.timestamp).getTime();
-    const isUnread = timestamp > readAllAt && !readIds.has(notificationId);
+    const timestamp = getNotificationTimestamp(notification);
+    const readKey = getNotificationReadKey(notification);
+    const isUnread =
+      timestamp > readAllAt &&
+      !readIds.has(readKey) &&
+      !readIds.has(notificationId);
 
     if (!isUnread) {
       return;
     }
 
-    persistReadIds(new Set([...readIds, notificationId]));
+    persistReadIds(new Set([...readIds, notificationId, readKey]));
   }
 
   return (
@@ -216,7 +239,7 @@ export function NotificationButton({ items }: NotificationButtonProps) {
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 z-20 mt-2 w-[26rem] rounded-xl border border-[var(--ops-border)] bg-[var(--ops-card)] p-3 shadow-lg">
+        <div className="fixed right-4 top-16 z-50 w-[min(calc(100vw-2rem),24rem)] overflow-hidden rounded-xl border border-[var(--ops-border)] bg-[var(--ops-card)] p-3 shadow-lg sm:right-6 lg:absolute lg:right-0 lg:top-full lg:mt-2 lg:w-[25rem]">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-[var(--ops-text)]">
               Notifications
@@ -230,7 +253,9 @@ export function NotificationButton({ items }: NotificationButtonProps) {
                 Read all
               </button>
             ) : (
-              <span className="text-xs text-[var(--ops-text-muted)]">Read</span>
+              <span className="text-xs text-[var(--ops-text-muted)]">
+                All read
+              </span>
             )}
           </div>
           {visibleItems.length === 0 ? (
@@ -238,15 +263,19 @@ export function NotificationButton({ items }: NotificationButtonProps) {
               No notifications yet.
             </p>
           ) : (
-            <ul className="mt-3 max-h-[39rem] space-y-2 overflow-y-auto pr-1">
+            <ul className="mt-3 max-h-[min(56vh,24rem)] space-y-1.5 overflow-y-auto pr-1">
               {visibleItems.map((item) => {
-                const itemTimestamp = new Date(item.timestamp).getTime();
-                const isUnread = itemTimestamp > readAllAt && !readIds.has(item.id);
+                const itemTimestamp = getNotificationTimestamp(item);
+                const readKey = getNotificationReadKey(item);
+                const isUnread =
+                  itemTimestamp > readAllAt &&
+                  !readIds.has(readKey) &&
+                  !readIds.has(item.id);
 
                 return (
                   <li key={item.id}>
                     <button
-                      className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
+                      className={`w-full rounded-lg border px-2.5 py-2 text-left transition ${
                         isUnread
                           ? "border-[var(--workspace-primary,var(--ops-primary))]/35 bg-[var(--ops-card)]"
                           : "border-[var(--ops-border)] bg-[var(--ops-card)]"
@@ -254,20 +283,20 @@ export function NotificationButton({ items }: NotificationButtonProps) {
                       onClick={() => markItemAsRead(item.id)}
                       type="button"
                     >
-                      <div className="flex items-start gap-3">
-                        <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--workspace-primary-soft,var(--ops-primary-soft))]">
+                      <div className="flex items-start gap-2.5">
+                        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--workspace-primary-soft,var(--ops-primary-soft))]">
                           <NotificationItemIcon icon={item.icon} />
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
-                            <p className="pr-2 text-[15px] font-semibold leading-5 text-[var(--ops-text)]">
+                            <p className="pr-2 text-sm font-semibold leading-5 text-[var(--ops-text)]">
                               {item.message}
                             </p>
-                            <span className="shrink-0 text-xs font-medium text-[var(--ops-text-muted)]">
+                            <span className="shrink-0 text-[11px] font-medium text-[var(--ops-text-muted)]">
                               {formatTime(item.timestamp)}
                             </span>
                           </div>
-                          <p className="mt-1 text-sm leading-5 text-[var(--ops-text-soft)]">
+                          <p className="mt-0.5 text-xs leading-5 text-[var(--ops-text-soft)]">
                             {item.detail}
                           </p>
                         </div>

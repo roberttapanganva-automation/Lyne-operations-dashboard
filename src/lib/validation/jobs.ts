@@ -82,5 +82,11 @@ export const updateJobSchema = z.object({
   title: z.string().trim().min(1, "Job title is required."),
 });
 
+export const bulkJobActionSchema = z.object({
+  action: z.literal("delete"),
+  ids: z.array(z.uuid()).min(1).max(200),
+});
+
+export type BulkJobActionInput = z.infer<typeof bulkJobActionSchema>;
 export type CreateJobInput = z.infer<typeof createJobSchema>;
 export type UpdateJobInput = z.infer<typeof updateJobSchema>;

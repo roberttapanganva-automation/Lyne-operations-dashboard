@@ -3,25 +3,34 @@
 import {
   ArrowsDownUpIcon,
   CaretDownIcon,
-  DotsThreeOutlineVerticalIcon,
-  FadersHorizontalIcon,
   FunnelSimpleIcon,
   MagnifyingGlassIcon,
-  SlidersHorizontalIcon,
-  DownloadSimpleIcon,
   UserCircleIcon,
 } from "@phosphor-icons/react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
+import { BulkActionBar } from "@/components/ui/BulkActionBar";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { DateTimeCell, DateTimeHeader } from "@/components/ui/DateTimeCell";
-import { DeleteRecordButton } from "@/components/records/DeleteRecordButton";
+import { downloadCsv } from "@/lib/csv/client";
+import { notify } from "@/lib/ui/toast";
+import type { ApiResponse } from "@/types/api";
 import type { LeadPipelineStageOption } from "@/lib/pipelines/queries";
 import type { Client, ClientSummary } from "@/types/domain";
+import {
+  LeadsAdvancedFiltersDialog,
+  type LeadAdvancedFilters,
+} from "./AdvancedFiltersDialog";
 import { AddLeadDialog } from "./AddLeadDialog";
+import { CrmActionsMenu } from "./CrmActionsMenu";
 import { EditLeadDialog } from "./EditLeadDialog";
+import { ImportCsvDialog } from "./ImportCsvDialog";
 import { LeadPriorityBadge, type LeadPriority } from "./LeadPriorityBadge";
 import { LeadsEmptyState } from "./LeadsEmptyState";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
+import { ManageFieldsDialog, type FieldOption } from "./ManageFieldsDialog";
 
 export type LeadListItem = {
   client: ClientSummary | null;
@@ -45,11 +54,16 @@ type LeadSort =
   | "follow_up_soonest";
 
 type LeadsListProps = {
+  activeTab: "leads" | "contacts";
   canCreateRecords: boolean;
   canDeleteRecords: boolean;
   clients: Client[];
   leads: LeadListItem[];
   stageOptions: LeadPipelineStageOption[];
+};
+
+type BulkDeleteResponse = {
+  deletedCount: number;
 };
 
 function formatCreatedDate(value: string) {
@@ -106,13 +120,106 @@ function getContactSecondaryLine(lead: LeadListItem) {
   return lead.client.email ?? lead.client.phone ?? lead.client.company_name ?? "";
 }
 
+const leadAdvancedFilterDefaults: LeadAdvancedFilters = {
+  createdFrom: "",
+  createdTo: "",
+  estimatedMax: "",
+  estimatedMin: "",
+  nextFollowUpFrom: "",
+  nextFollowUpTo: "",
+  pipelineStage: "all",
+  priority: "all",
+  source: "",
+  status: "all",
+};
+
+const leadFieldOptions: FieldOption[] = [
+  { id: "name", label: "Lead name", locked: true },
+  { id: "status", label: "Status" },
+  { id: "priority", label: "Priority" },
+  { id: "estimated_value", label: "Estimated value" },
+  { id: "source", label: "Source" },
+  { id: "stage", label: "Pipeline stage" },
+  { id: "next_follow_up", label: "Next follow-up" },
+  { id: "created", label: "Created" },
+];
+
+const defaultLeadFields = leadFieldOptions.map((field) => field.id);
+const leadImportHeaders = [
+  "title",
+  "contact_name",
+  "email",
+  "phone",
+  "source",
+  "estimated_value",
+  "priority",
+  "status",
+  "notes",
+  "next_follow_up_at",
+];
+
+function getDateTimestamp(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function getDayEndTimestamp(value: string) {
+  const timestamp = new Date(`${value}T23:59:59`).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function countLeadAdvancedFilters(filters: LeadAdvancedFilters) {
+  return [
+    filters.status !== "all",
+    filters.priority !== "all",
+    filters.pipelineStage !== "all",
+    Boolean(filters.source.trim()),
+    Boolean(filters.estimatedMin),
+    Boolean(filters.estimatedMax),
+    Boolean(filters.nextFollowUpFrom),
+    Boolean(filters.nextFollowUpTo),
+    Boolean(filters.createdFrom),
+    Boolean(filters.createdTo),
+  ].filter(Boolean).length;
+}
+
+function getInitialVisibleFields() {
+  if (typeof window === "undefined") {
+    return defaultLeadFields;
+  }
+
+  try {
+    const savedFields = window.localStorage.getItem("opspilot:crm:lead-fields");
+    if (!savedFields) {
+      return defaultLeadFields;
+    }
+
+    const parsedFields = JSON.parse(savedFields) as string[];
+    const supportedFields = parsedFields.filter((field) =>
+      leadFieldOptions.some((option) => option.id === field),
+    );
+
+    return supportedFields.includes("name")
+      ? [...new Set(["name", ...supportedFields])]
+      : defaultLeadFields;
+  } catch {
+    return defaultLeadFields;
+  }
+}
+
 export function LeadsList({
+  activeTab,
   canCreateRecords,
   canDeleteRecords,
   clients,
   leads,
   stageOptions,
 }: LeadsListProps) {
+  const router = useRouter();
   const [activeView, setActiveView] = useState<LeadView>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
@@ -120,6 +227,28 @@ export function LeadsList({
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<LeadSort>("newest");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [advancedFilters, setAdvancedFilters] = useState<LeadAdvancedFilters>(
+    leadAdvancedFilterDefaults,
+  );
+  const [visibleFields, setVisibleFields] = useState(getInitialVisibleFields);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [editingLead, setEditingLead] = useState<LeadListItem | null>(null);
+
+  function updateVisibleFields(nextFields: string[]) {
+    const withRequiredName = [...new Set(["name", ...nextFields])];
+    setVisibleFields(withRequiredName);
+
+    try {
+      window.localStorage.setItem(
+        "opspilot:crm:lead-fields",
+        JSON.stringify(withRequiredName),
+      );
+    } catch {
+      // Keep in-memory fields even when storage is unavailable.
+    }
+  }
 
   const stageMap = useMemo(
     () =>
@@ -181,6 +310,82 @@ export function LeadsList({
         }
       }
 
+      if (advancedFilters.status !== "all" && lead.status !== advancedFilters.status) {
+        return false;
+      }
+
+      if (
+        advancedFilters.priority !== "all" &&
+        lead.priority !== advancedFilters.priority
+      ) {
+        return false;
+      }
+
+      if (advancedFilters.pipelineStage !== "all") {
+        if (advancedFilters.pipelineStage === "__none__") {
+          if (lead.stage_id) {
+            return false;
+          }
+        } else if (lead.stage_id !== advancedFilters.pipelineStage) {
+          return false;
+        }
+      }
+
+      if (
+        advancedFilters.source.trim() &&
+        !(lead.source ?? "")
+          .toLowerCase()
+          .includes(advancedFilters.source.trim().toLowerCase())
+      ) {
+        return false;
+      }
+
+      const minimumValue = advancedFilters.estimatedMin
+        ? Number(advancedFilters.estimatedMin)
+        : null;
+      const maximumValue = advancedFilters.estimatedMax
+        ? Number(advancedFilters.estimatedMax)
+        : null;
+
+      if (minimumValue !== null && lead.estimated_value < minimumValue) {
+        return false;
+      }
+
+      if (maximumValue !== null && lead.estimated_value > maximumValue) {
+        return false;
+      }
+
+      const followUpTimestamp = getDateTimestamp(lead.next_follow_up_at);
+      const createdTimestamp = getDateTimestamp(lead.created_at);
+      const followUpFrom = advancedFilters.nextFollowUpFrom
+        ? getDateTimestamp(advancedFilters.nextFollowUpFrom)
+        : null;
+      const followUpTo = advancedFilters.nextFollowUpTo
+        ? getDayEndTimestamp(advancedFilters.nextFollowUpTo)
+        : null;
+      const createdFrom = advancedFilters.createdFrom
+        ? getDateTimestamp(advancedFilters.createdFrom)
+        : null;
+      const createdTo = advancedFilters.createdTo
+        ? getDayEndTimestamp(advancedFilters.createdTo)
+        : null;
+
+      if (followUpFrom !== null && (followUpTimestamp ?? 0) < followUpFrom) {
+        return false;
+      }
+
+      if (followUpTo !== null && (followUpTimestamp ?? Infinity) > followUpTo) {
+        return false;
+      }
+
+      if (createdFrom !== null && (createdTimestamp ?? 0) < createdFrom) {
+        return false;
+      }
+
+      if (createdTo !== null && (createdTimestamp ?? Infinity) > createdTo) {
+        return false;
+      }
+
       if (!query) {
         return true;
       }
@@ -223,6 +428,7 @@ export function LeadsList({
     return nextLeads;
   }, [
     activeView,
+    advancedFilters,
     leads,
     priorityFilter,
     searchQuery,
@@ -258,6 +464,110 @@ export function LeadsList({
     );
   }
 
+  function openLeadEditor(lead: LeadListItem) {
+    if (!canCreateRecords) {
+      return;
+    }
+
+    setEditingLead(lead);
+  }
+
+  function clearFilters() {
+    setActiveView("all");
+    setSearchQuery("");
+    setStatusFilter("all");
+    setPriorityFilter("all");
+    setStageFilter("all");
+    setAdvancedFilters(leadAdvancedFilterDefaults);
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+    setBulkDeleteError(null);
+  }
+
+  async function deleteSelectedLeads() {
+    setBulkDeleteError(null);
+    setIsBulkDeleting(true);
+
+    try {
+      const response = await fetch("/api/leads/bulk", {
+        body: JSON.stringify({
+          action: "delete",
+          ids: selectedIds,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const result = (await response.json()) as ApiResponse<BulkDeleteResponse>;
+
+      if (!response.ok || !result.ok) {
+        const errorMessage =
+          result.ok
+            ? "We could not delete the selected leads."
+            : result.error.message;
+        setBulkDeleteError(errorMessage);
+        notify.error("Lead delete failed", errorMessage);
+        return;
+      }
+
+      notify.success(
+        result.data.deletedCount === 1 ? "Lead deleted" : "Leads deleted",
+        result.data.deletedCount === 1
+          ? "The selected lead was removed."
+          : "The selected leads were removed.",
+      );
+      clearSelection();
+      setBulkDeleteOpen(false);
+      router.refresh();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "We could not delete the selected leads.";
+      setBulkDeleteError(errorMessage);
+      notify.error("Lead delete failed", errorMessage);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
+
+  function exportVisibleLeads() {
+    downloadCsv({
+      filename: "opspilot-leads.csv",
+      headers: [
+        "title",
+        "contact",
+        "email",
+        "phone",
+        "status",
+        "priority",
+        "estimated_value",
+        "source",
+        "pipeline_stage",
+        "next_follow_up_at",
+        "created_at",
+      ],
+      rows: filteredLeads.map((lead) => ({
+        contact: lead.client?.name ?? "",
+        created_at: lead.created_at,
+        email: lead.client?.email ?? "",
+        estimated_value: lead.estimated_value,
+        next_follow_up_at: lead.next_follow_up_at ?? "",
+        phone: lead.client?.phone ?? "",
+        pipeline_stage: lead.stage_id
+          ? stageMap.get(lead.stage_id)?.name ?? ""
+          : "",
+        priority: lead.priority,
+        source: lead.source ?? "",
+        status: lead.status,
+        title: lead.title,
+      })),
+    });
+  }
+
   if (leads.length === 0) {
     return (
       <LeadsEmptyState
@@ -268,7 +578,8 @@ export function LeadsList({
     );
   }
 
-  const showActions = canCreateRecords || canDeleteRecords;
+  const advancedFilterCount = countLeadAdvancedFilters(advancedFilters);
+  const fieldVisible = (fieldId: string) => visibleFields.includes(fieldId);
   const viewOptions: Array<{ key: LeadView; label: string; count: number }> = [
     { key: "all", label: "All", count: viewCounts.all },
     { key: "open", label: "Open", count: viewCounts.open },
@@ -282,58 +593,92 @@ export function LeadsList({
   ];
 
   return (
-    <Card className="overflow-hidden">
-      <div className="border-b border-[var(--ops-border)] px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-xl font-semibold text-[var(--ops-text)]">
-                Leads
-              </h2>
+              <div
+                aria-label="CRM sections"
+                className="flex flex-wrap gap-2"
+                role="tablist"
+              >
+                <Link
+                  aria-selected={activeTab === "leads"}
+                  className={`inline-flex h-8 items-center justify-center rounded-full px-3 text-[13px] font-semibold transition ${
+                    activeTab === "leads"
+                      ? "bg-[var(--workspace-primary,var(--ops-primary))] text-white shadow-[0_10px_24px_var(--workspace-primary-glow,var(--ops-primary-glow))]"
+                      : "bg-[var(--ops-card-soft)] text-[var(--ops-text-soft)] hover:text-[var(--ops-text)]"
+                  }`}
+                  href="/leads?tab=leads"
+                  role="tab"
+                >
+                  Leads
+                </Link>
+                <Link
+                  aria-selected={activeTab === "contacts"}
+                  className={`inline-flex h-8 items-center justify-center rounded-full px-3 text-[13px] font-semibold transition ${
+                    activeTab === "contacts"
+                      ? "bg-[var(--workspace-primary,var(--ops-primary))] text-white shadow-[0_10px_24px_var(--workspace-primary-glow,var(--ops-primary-glow))]"
+                      : "bg-[var(--ops-card-soft)] text-[var(--ops-text-soft)] hover:text-[var(--ops-text)]"
+                  }`}
+                  href="/leads?tab=contacts"
+                  role="tab"
+                >
+                  Contacts
+                </Link>
+              </div>
               <span className="inline-flex items-center rounded-full bg-[var(--ops-card-soft)] px-3 py-1 text-sm font-semibold text-[var(--ops-text-soft)]">
                 {leads.length} {leads.length === 1 ? "Lead" : "Leads"}
               </span>
             </div>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ops-text-soft)]">
-              Keep the team focused on live opportunities, response timing, and the next best follow-up across the active workspace.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-[var(--ops-border)] bg-[var(--ops-card)] px-4 text-sm font-semibold text-[var(--ops-text-soft)] opacity-75"
-              disabled
-              title="Lead import will be added later."
-              type="button"
-            >
-              <DownloadSimpleIcon
-                aria-hidden="true"
-                className="mr-2"
-                size={18}
-                weight="regular"
+            {canCreateRecords ? (
+              <ImportCsvDialog
+                endpoint="/api/leads/import"
+                label="leads"
+                requiredField="title"
+                templateHeaders={leadImportHeaders}
+                triggerId="leads-import-trigger"
               />
-              Import leads
-            </button>
+            ) : null}
             {canCreateRecords ? (
               <AddLeadDialog
-                className="h-10"
+                className="h-9"
                 clients={clients}
                 stageOptions={stageOptions}
                 variant="primary"
               />
             ) : null}
-            <button
-              aria-label="More lead list actions"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--ops-border)] bg-[var(--ops-card)] text-[var(--ops-text-soft)] opacity-75"
-              disabled
-              type="button"
-            >
-              <DotsThreeOutlineVerticalIcon aria-hidden="true" size={18} weight="bold" />
-            </button>
+            <CrmActionsMenu
+              ariaLabel="More lead list actions"
+              items={[
+                ...(canCreateRecords
+                  ? [
+                      {
+                        label: "Import leads",
+                        onClick: () =>
+                          document.getElementById("leads-import-trigger")?.click(),
+                      },
+                    ]
+                  : []),
+                { label: "Export leads", onClick: exportVisibleLeads },
+                {
+                  label: "Manage fields",
+                  onClick: () =>
+                    document.getElementById("leads-fields-trigger")?.click(),
+                },
+                { label: "Clear filters", onClick: clearFilters },
+                { href: "/pipelines", label: "View pipeline board" },
+                { label: "Refresh list", onClick: () => router.refresh() },
+              ]}
+            />
           </div>
         </div>
 
-        <div className="mt-5 flex flex-col gap-4">
+        <div className="mt-4 flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             {viewOptions.map((view) => (
               <button
@@ -352,7 +697,7 @@ export function LeadsList({
             ))}
           </div>
 
-          <div className="grid gap-2.5 xl:grid-cols-[minmax(220px,1fr)_160px_160px_170px_150px_auto_auto]">
+          <div className="grid gap-2 xl:grid-cols-[minmax(220px,1fr)_160px_160px_170px_150px_auto_auto]">
             <div className="relative min-w-0 xl:col-span-1">
               <MagnifyingGlassIcon
                 aria-hidden="true"
@@ -424,7 +769,7 @@ export function LeadsList({
               />
               <select
                 aria-label="Filter leads by stage"
-                className="h-9 w-full rounded-lg border border-[var(--ops-border)] bg-white px-3 pr-8 text-sm text-[var(--ops-text)] shadow-sm outline-none transition focus:border-[var(--workspace-primary,var(--ops-primary))] focus:ring-2 focus:ring-[var(--workspace-primary-glow,var(--ops-primary-glow))]"
+                className="h-9 w-full appearance-none rounded-lg border border-[var(--ops-border)] bg-white px-3 pr-8 text-sm text-[var(--ops-text)] shadow-sm outline-none transition focus:border-[var(--workspace-primary,var(--ops-primary))] focus:ring-2 focus:ring-[var(--workspace-primary-glow,var(--ops-primary-glow))]"
                 onChange={(event) => setStageFilter(event.target.value)}
                 value={stageFilter}
               >
@@ -458,256 +803,305 @@ export function LeadsList({
               </select>
             </div>
 
-            <button
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-[var(--ops-border)] bg-[var(--ops-card)] px-3.5 text-sm font-semibold text-[var(--ops-text-soft)] opacity-75"
-              disabled
-              title="Advanced filters will be added later."
-              type="button"
-            >
-              <FadersHorizontalIcon aria-hidden="true" className="mr-2" size={16} weight="regular" />
-              Advanced filters
-            </button>
+            <LeadsAdvancedFiltersDialog
+              activeCount={advancedFilterCount}
+              filters={advancedFilters}
+              onApply={setAdvancedFilters}
+              onReset={() => setAdvancedFilters(leadAdvancedFilterDefaults)}
+              stageOptions={stageOptions}
+            />
 
-            <button
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-[var(--ops-border)] bg-[var(--ops-card)] px-3.5 text-sm font-semibold text-[var(--ops-text-soft)] opacity-75"
-              disabled
-              title="Manage fields will be added later."
-              type="button"
-            >
-              <SlidersHorizontalIcon aria-hidden="true" className="mr-2" size={16} weight="regular" />
-              Manage fields
-            </button>
+            <ManageFieldsDialog
+              fields={leadFieldOptions}
+              onChange={updateVisibleFields}
+              title="Lead"
+              triggerId="leads-fields-trigger"
+              value={visibleFields}
+            />
           </div>
+
+          <BulkActionBar
+            canDelete={canDeleteRecords}
+            canEdit={false}
+            entityLabel="lead"
+            onClearSelection={clearSelection}
+            onDelete={() => setBulkDeleteOpen(true)}
+            selectedCount={selectedIds.length}
+          />
+          {bulkDeleteError ? (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--ops-danger)]">
+              {bulkDeleteError}
+            </p>
+          ) : null}
         </div>
       </div>
 
-      {filteredLeads.length === 0 ? (
-        <div className="px-5 py-10 text-center text-sm text-[var(--ops-text-soft)] sm:px-6">
-          No leads match the current view.
-        </div>
-      ) : (
-        <>
-          <div className="hidden overflow-x-auto lg:block">
-            <table className="min-w-full text-left text-sm">
-              <thead className="sticky top-0 z-10 bg-[var(--ops-card-soft)] text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
-                <tr>
-                  <th className="px-5 py-3 sm:px-6" scope="col">
-                    <input
-                      aria-label="Select all leads"
-                      checked={allFilteredSelected}
-                      className="h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
-                      onChange={toggleSelectAll}
-                      type="checkbox"
-                    />
-                  </th>
-                  <th className="px-5 py-3 sm:px-6" scope="col">
-                    Lead name
-                  </th>
-                  <th className="px-5 py-3" scope="col">
-                    Status
-                  </th>
-                  <th className="px-5 py-3" scope="col">
-                    Priority
-                  </th>
-                  <th className="px-5 py-3" scope="col">
-                    Estimated value
-                  </th>
-                  <th className="px-5 py-3" scope="col">
-                    Source
-                  </th>
-                  <th className="px-5 py-3" scope="col">
-                    Pipeline stage
-                  </th>
-                  <th className="px-5 py-3" scope="col">
-                    <DateTimeHeader label="Next follow-up" />
-                  </th>
-                  <th className="px-5 py-3" scope="col">
-                    Created
-                  </th>
-                  {showActions ? (
-                    <th className="px-5 py-3 text-right" scope="col">
-                      Actions
-                    </th>
-                  ) : null}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ops-border)] bg-white">
-                {filteredLeads.map((lead) => (
-                  <tr className="align-top" key={lead.id}>
-                    <td className="px-5 py-4 sm:px-6">
+      <Card className="overflow-hidden">
+        {filteredLeads.length === 0 ? (
+          <div className="px-5 py-10 text-center text-sm text-[var(--ops-text-soft)] sm:px-6">
+            No leads match the current view.
+          </div>
+        ) : (
+          <>
+            <div className="hidden max-h-[min(68vh,44rem)] overflow-auto lg:block">
+              <table className="min-w-full text-left text-sm">
+                <thead className="sticky top-0 z-0 bg-[var(--ops-card-soft)] text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
+                  <tr>
+                    <th className="px-5 py-3 sm:px-6" scope="col">
                       <input
-                        aria-label={`Select ${lead.title}`}
-                        checked={selectedIds.includes(lead.id)}
-                        className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
-                        onChange={() => toggleLeadSelection(lead.id)}
+                        aria-label="Select all leads"
+                        checked={allFilteredSelected}
+                        className="h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                        onChange={toggleSelectAll}
                         type="checkbox"
                       />
-                    </td>
-                    <td className="px-5 py-4 sm:px-6">
-                      <div className="flex items-start gap-3">
-                        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--workspace-primary-soft,var(--ops-primary-soft))] text-sm font-semibold text-[var(--workspace-primary,var(--ops-primary-dark))]">
-                          {lead.client ? (
-                            getInitials(lead)
-                          ) : (
-                            <UserCircleIcon aria-hidden="true" size={20} weight="duotone" />
-                          )}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="font-medium text-[var(--ops-text)]">
-                            {lead.title}
-                          </p>
-                          <div className="mt-1 space-y-1 text-xs text-[var(--ops-text-muted)]">
-                            <p>{lead.client?.name ?? "No contact linked"}</p>
-                            {getContactSecondaryLine(lead) ? (
-                              <p>{getContactSecondaryLine(lead)}</p>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <LeadStatusBadge status={lead.status} />
-                    </td>
-                    <td className="px-5 py-4">
-                      <LeadPriorityBadge priority={lead.priority} />
-                    </td>
-                    <td className="px-5 py-4 text-[var(--ops-text-soft)]">
-                      {formatCurrency(lead.estimated_value)}
-                    </td>
-                    <td className="px-5 py-4 text-[var(--ops-text-soft)]">
-                      {lead.source ?? "Not set"}
-                    </td>
-                    <td className="px-5 py-4 text-[var(--ops-text-soft)]">
-                      {lead.stage_id
-                        ? stageMap.get(lead.stage_id)?.name ?? "Assigned"
-                        : "No stage"}
-                    </td>
-                    <td className="px-5 py-4 text-[var(--ops-text-soft)]">
-                      <DateTimeCell value={lead.next_follow_up_at} />
-                    </td>
-                    <td className="px-5 py-4 text-[var(--ops-text-soft)]">
-                      {formatCreatedDate(lead.created_at)}
-                    </td>
-                    {showActions ? (
-                      <td className="px-5 py-4">
-                        <div className="flex justify-end gap-2">
-                          {canCreateRecords ? <EditLeadDialog lead={lead} /> : null}
-                          {canDeleteRecords ? (
-                            <DeleteRecordButton
-                              endpoint={`/api/leads/${lead.id}`}
-                              label={`Delete lead ${lead.title}`}
-                            />
-                          ) : null}
-                        </div>
-                      </td>
+                    </th>
+                    <th className="px-5 py-3 sm:px-6" scope="col">
+                      Lead name
+                    </th>
+                    {fieldVisible("status") ? (
+                      <th className="px-5 py-3" scope="col">
+                        Status
+                      </th>
+                    ) : null}
+                    {fieldVisible("priority") ? (
+                      <th className="px-5 py-3" scope="col">
+                        Priority
+                      </th>
+                    ) : null}
+                    {fieldVisible("estimated_value") ? (
+                      <th className="px-5 py-3" scope="col">
+                        Estimated value
+                      </th>
+                    ) : null}
+                    {fieldVisible("source") ? (
+                      <th className="px-5 py-3" scope="col">
+                        Source
+                      </th>
+                    ) : null}
+                    {fieldVisible("stage") ? (
+                      <th className="px-5 py-3" scope="col">
+                        Pipeline stage
+                      </th>
+                    ) : null}
+                    {fieldVisible("next_follow_up") ? (
+                      <th className="px-5 py-3" scope="col">
+                        <DateTimeHeader label="Next follow-up" />
+                      </th>
+                    ) : null}
+                    {fieldVisible("created") ? (
+                      <th className="px-5 py-3" scope="col">
+                        Created
+                      </th>
                     ) : null}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="divide-y divide-[var(--ops-border)] lg:hidden">
-            {filteredLeads.map((lead) => (
-              <article className="space-y-4 p-5" key={lead.id}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--workspace-primary-soft,var(--ops-primary-soft))] text-sm font-semibold text-[var(--workspace-primary,var(--ops-primary-dark))]">
-                      {lead.client ? (
-                        getInitials(lead)
-                      ) : (
-                        <UserCircleIcon aria-hidden="true" size={20} weight="duotone" />
-                      )}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-[var(--ops-text)]">
-                        {lead.title}
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
-                        {lead.client?.name ?? "No contact linked"}
-                      </p>
-                      {getContactSecondaryLine(lead) ? (
-                        <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
-                          {getContactSecondaryLine(lead)}
-                        </p>
+                </thead>
+                <tbody className="divide-y divide-[var(--ops-border)] bg-white">
+                  {filteredLeads.map((lead) => (
+                    <tr
+                      className={`align-top ${canCreateRecords ? "cursor-pointer transition hover:bg-[var(--ops-card-soft)]" : ""}`}
+                      key={lead.id}
+                      onDoubleClick={() => openLeadEditor(lead)}
+                      title={canCreateRecords ? "Double-click to edit lead" : undefined}
+                    >
+                      <td className="px-5 py-4 sm:px-6">
+                        <input
+                          aria-label={`Select ${lead.title}`}
+                          checked={selectedIds.includes(lead.id)}
+                          className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                          onChange={() => toggleLeadSelection(lead.id)}
+                          onClick={(event) => event.stopPropagation()}
+                          onDoubleClick={(event) => event.stopPropagation()}
+                          type="checkbox"
+                        />
+                      </td>
+                      <td className="px-5 py-4 sm:px-6">
+                        <div className="flex items-start gap-3">
+                          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--workspace-primary-soft,var(--ops-primary-soft))] text-sm font-semibold text-[var(--workspace-primary,var(--ops-primary-dark))]">
+                            {lead.client ? (
+                              getInitials(lead)
+                            ) : (
+                              <UserCircleIcon aria-hidden="true" size={20} weight="duotone" />
+                            )}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-medium text-[var(--ops-text)]">
+                              {lead.title}
+                            </p>
+                            <div className="mt-1 space-y-1 text-xs text-[var(--ops-text-muted)]">
+                              <p>{lead.client?.name ?? "No contact linked"}</p>
+                              {getContactSecondaryLine(lead) ? (
+                                <p>{getContactSecondaryLine(lead)}</p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      {fieldVisible("status") ? (
+                        <td className="px-5 py-4">
+                          <LeadStatusBadge status={lead.status} />
+                        </td>
                       ) : null}
+                      {fieldVisible("priority") ? (
+                        <td className="px-5 py-4">
+                          <LeadPriorityBadge priority={lead.priority} />
+                        </td>
+                      ) : null}
+                      {fieldVisible("estimated_value") ? (
+                        <td className="px-5 py-4 text-[var(--ops-text-soft)]">
+                          {formatCurrency(lead.estimated_value)}
+                        </td>
+                      ) : null}
+                      {fieldVisible("source") ? (
+                        <td className="px-5 py-4 text-[var(--ops-text-soft)]">
+                          {lead.source ?? "Not set"}
+                        </td>
+                      ) : null}
+                      {fieldVisible("stage") ? (
+                        <td className="px-5 py-4 text-[var(--ops-text-soft)]">
+                          {lead.stage_id
+                            ? stageMap.get(lead.stage_id)?.name ?? "Assigned"
+                            : "No stage"}
+                        </td>
+                      ) : null}
+                      {fieldVisible("next_follow_up") ? (
+                        <td className="px-5 py-4 text-[var(--ops-text-soft)]">
+                          <DateTimeCell value={lead.next_follow_up_at} />
+                        </td>
+                      ) : null}
+                      {fieldVisible("created") ? (
+                        <td className="px-5 py-4 text-[var(--ops-text-soft)]">
+                          {formatCreatedDate(lead.created_at)}
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-[var(--ops-border)] lg:hidden">
+              {filteredLeads.map((lead) => (
+                <article
+                  className={`space-y-4 p-5 ${canCreateRecords ? "cursor-pointer transition hover:bg-[var(--ops-card-soft)]" : ""}`}
+                  key={lead.id}
+                  onDoubleClick={() => openLeadEditor(lead)}
+                  title={canCreateRecords ? "Double-click to edit lead" : undefined}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--workspace-primary-soft,var(--ops-primary-soft))] text-sm font-semibold text-[var(--workspace-primary,var(--ops-primary-dark))]">
+                        {lead.client ? (
+                          getInitials(lead)
+                        ) : (
+                          <UserCircleIcon aria-hidden="true" size={20} weight="duotone" />
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[var(--ops-text)]">
+                          {lead.title}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
+                          {lead.client?.name ?? "No contact linked"}
+                        </p>
+                        {getContactSecondaryLine(lead) ? (
+                          <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
+                            {getContactSecondaryLine(lead)}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <input
+                      aria-label={`Select ${lead.title}`}
+                      checked={selectedIds.includes(lead.id)}
+                      className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                      onChange={() => toggleLeadSelection(lead.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      onDoubleClick={(event) => event.stopPropagation()}
+                      type="checkbox"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <LeadStatusBadge status={lead.status} />
+                    <LeadPriorityBadge priority={lead.priority} />
+                  </div>
+
+                  <div className="grid gap-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
+                        Estimated value
+                      </p>
+                      <p className="mt-1 text-[var(--ops-text-soft)]">
+                        {formatCurrency(lead.estimated_value)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
+                        Source
+                      </p>
+                      <p className="mt-1 text-[var(--ops-text-soft)]">
+                        {lead.source ?? "Not set"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
+                        Pipeline stage
+                      </p>
+                      <p className="mt-1 text-[var(--ops-text-soft)]">
+                        {lead.stage_id
+                          ? stageMap.get(lead.stage_id)?.name ?? "Assigned"
+                          : "No stage"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
+                        Created
+                      </p>
+                      <p className="mt-1 text-[var(--ops-text-soft)]">
+                        {formatCreatedDate(lead.created_at)}
+                      </p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
+                        Next follow-up
+                      </p>
+                      <p className="mt-1 text-[var(--ops-text-soft)]">
+                        <DateTimeCell value={lead.next_follow_up_at} />
+                      </p>
                     </div>
                   </div>
-                  <input
-                    aria-label={`Select ${lead.title}`}
-                    checked={selectedIds.includes(lead.id)}
-                    className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
-                    onChange={() => toggleLeadSelection(lead.id)}
-                    type="checkbox"
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <LeadStatusBadge status={lead.status} />
-                  <LeadPriorityBadge priority={lead.priority} />
-                </div>
-
-                <div className="grid gap-3 text-sm sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
-                      Estimated value
-                    </p>
-                    <p className="mt-1 text-[var(--ops-text-soft)]">
-                      {formatCurrency(lead.estimated_value)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
-                      Source
-                    </p>
-                    <p className="mt-1 text-[var(--ops-text-soft)]">
-                      {lead.source ?? "Not set"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
-                      Pipeline stage
-                    </p>
-                    <p className="mt-1 text-[var(--ops-text-soft)]">
-                      {lead.stage_id
-                        ? stageMap.get(lead.stage_id)?.name ?? "Assigned"
-                        : "No stage"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
-                      Created
-                    </p>
-                    <p className="mt-1 text-[var(--ops-text-soft)]">
-                      {formatCreatedDate(lead.created_at)}
-                    </p>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
-                      Next follow-up
-                    </p>
-                    <p className="mt-1 text-[var(--ops-text-soft)]">
-                      <DateTimeCell value={lead.next_follow_up_at} />
-                    </p>
-                  </div>
-                </div>
-
-                {showActions ? (
-                  <div className="flex justify-end gap-2">
-                    {canCreateRecords ? <EditLeadDialog lead={lead} /> : null}
-                    {canDeleteRecords ? (
-                      <DeleteRecordButton
-                        endpoint={`/api/leads/${lead.id}`}
-                        label={`Delete lead ${lead.title}`}
-                      />
-                    ) : null}
-                  </div>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        </>
-      )}
-    </Card>
+                </article>
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
+      <ConfirmDeleteDialog
+        confirmLabel="Delete leads"
+        isSubmitting={isBulkDeleting}
+        itemCount={selectedIds.length}
+        onCancel={() => {
+          if (!isBulkDeleting) {
+            setBulkDeleteOpen(false);
+          }
+        }}
+        onConfirm={deleteSelectedLeads}
+        open={bulkDeleteOpen}
+        title="Delete selected leads?"
+      />
+      {editingLead ? (
+        <EditLeadDialog
+          hideTrigger
+          lead={editingLead}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingLead(null);
+            }
+          }}
+          open
+        />
+      ) : null}
+    </div>
   );
 }

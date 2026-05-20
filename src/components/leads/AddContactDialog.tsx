@@ -4,6 +4,7 @@ import { AddressBookIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { Client } from "@/types/domain";
 
@@ -63,19 +64,24 @@ export function AddContactDialog({ className = "" }: AddContactDialogProps) {
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not create the contact. Please try again.");
+        const errorMessage =
+          message ?? "We could not create the contact. Please try again.";
+        setError(errorMessage);
+        notify.error("Contact could not be added", errorMessage);
         return;
       }
 
       formRef.current?.reset();
       setIsOpen(false);
+      notify.success("Contact added", "The contact was saved to your workspace.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not create the contact. Please try again.",
-      );
+          : "We could not create the contact. Please try again.";
+      setError(errorMessage);
+      notify.error("Contact could not be added", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

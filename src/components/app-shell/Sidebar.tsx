@@ -1,5 +1,6 @@
 "use client";
 
+import { use } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,22 +14,25 @@ import {
   getWorkspaceLogoUrl,
 } from "@/lib/branding/display";
 import type { ActiveWorkspaceContext } from "@/types/domain";
-import { Input } from "@/components/ui/Input";
+import type { CurrentAccountSummary } from "@/lib/account/queries";
 import { getVisibleNavItems } from "./nav-items";
 import { UserMenu } from "./UserMenu";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 type SidebarProps = {
   collapsed: boolean;
+  currentAccount: Promise<CurrentAccountSummary | null>;
   onToggleCollapsed: () => void;
   workspaceContext: ActiveWorkspaceContext;
 };
 
 export function Sidebar({
   collapsed,
+  currentAccount,
   onToggleCollapsed,
   workspaceContext,
 }: SidebarProps) {
+  const account = use(currentAccount);
   const pathname = usePathname();
   const appName = getWorkspaceDisplayName({
     branding: workspaceContext.branding,
@@ -86,35 +90,39 @@ export function Sidebar({
         <WorkspaceSwitcher workspaceContext={workspaceContext} />
       ) : null}
 
-      {!collapsed ? (
-        <div className="mt-4">
-          <Input
-            className="h-9 w-full rounded-lg border-white/10 bg-white/8 text-white placeholder:text-white/45 focus:border-[var(--ops-primary)]"
-            id="global-search"
-            icon={
-              <MagnifyingGlassIcon aria-hidden="true" size={18} weight="regular" />
-            }
-            label="Search anything"
-            placeholder="Search anything..."
-            type="search"
-          />
-        </div>
-      ) : (
-        <div className="mt-5 flex justify-center">
-          <button
-            aria-label="Search anything"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/8 text-white/75 transition hover:bg-white/12 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
-            type="button"
-          >
-            <MagnifyingGlassIcon aria-hidden="true" size={18} weight="regular" />
-          </button>
-        </div>
-      )}
-
       <nav
         className={`flex flex-1 flex-col gap-1 ${collapsed ? "mt-6" : "mt-5"}`}
         aria-label="Main"
       >
+        {collapsed ? (
+          <button
+            aria-label="Search anything"
+            className="mb-2 inline-flex h-10 w-full items-center justify-center rounded-lg border border-white/10 bg-white/8 text-white/75 transition hover:bg-white/12 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+            type="button"
+          >
+            <MagnifyingGlassIcon aria-hidden="true" size={18} weight="regular" />
+          </button>
+        ) : (
+          <div className="mb-2 px-0">
+            <label className="sr-only" htmlFor="global-search">
+              Search anything
+            </label>
+            <div className="relative">
+              <MagnifyingGlassIcon
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/45"
+                size={17}
+                weight="regular"
+              />
+              <input
+                className="h-9 w-full rounded-lg border border-white/10 bg-white/8 px-3 pl-9 text-sm text-white outline-none transition placeholder:text-white/45 hover:bg-white/10 focus:border-[var(--ops-primary)] focus:ring-2 focus:ring-[var(--ops-primary-glow)]"
+                id="global-search"
+                placeholder="Search..."
+                type="search"
+              />
+            </div>
+          </div>
+        )}
         {visibleNavItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.Icon;
@@ -139,7 +147,8 @@ export function Sidebar({
       </nav>
 
       {collapsed ? (
-        <div className="mb-4 flex justify-center">
+        <div className="mt-4 flex flex-col items-center gap-3">
+          <UserMenu account={account} compact />
           <button
             aria-label={collapsed ? "Open sidebar" : "Close sidebar"}
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/25 bg-[var(--ops-primary)] text-white shadow-[0_10px_24px_var(--ops-primary-glow)] transition hover:bg-[var(--ops-primary-dark)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
@@ -151,7 +160,7 @@ export function Sidebar({
         </div>
       ) : (
         <div className="relative mt-2">
-          <UserMenu />
+          <UserMenu account={account} />
           <button
             aria-label={collapsed ? "Open sidebar" : "Close sidebar"}
             className="absolute right-[-14px] top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-[var(--ops-primary)] text-white shadow-[0_10px_24px_var(--ops-primary-glow)] transition hover:bg-[var(--ops-primary-dark)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"

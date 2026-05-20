@@ -1,5 +1,4 @@
 import { JobsList } from "@/components/jobs/JobsList";
-import { JobsPageHeader } from "@/components/jobs/JobsPageHeader";
 import { JobsToolbar } from "@/components/jobs/JobsToolbar";
 import { getJobsForActiveWorkspace } from "@/lib/jobs/queries";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
@@ -32,8 +31,7 @@ export default async function JobsPage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <JobsPageHeader canCreateRecords={canCreateRecords} />
-      <JobsToolbar />
+      <JobsToolbar canCreateRecords={canCreateRecords} />
       <JobsList
         canCreateRecords={canCreateRecords}
         canDeleteRecords={canDeleteRecords}

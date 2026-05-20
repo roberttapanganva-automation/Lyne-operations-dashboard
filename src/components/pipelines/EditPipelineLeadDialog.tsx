@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { PipelineBoardCard } from "@/types/domain";
 
@@ -113,18 +114,23 @@ export function EditPipelineLeadDialog({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not update the lead. Please try again.");
+        const nextError =
+          message ?? "We could not update the lead. Please try again.";
+        setError(nextError);
+        notify.error("Lead could not be updated", nextError);
         return;
       }
 
+      notify.success("Lead updated", "The lead details were saved.");
       setDialogOpen(false);
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const nextError =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not update the lead. Please try again.",
-      );
+          : "We could not update the lead. Please try again.";
+      setError(nextError);
+      notify.error("Lead could not be updated", nextError);
     } finally {
       setIsSubmitting(false);
     }

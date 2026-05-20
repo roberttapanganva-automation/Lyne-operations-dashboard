@@ -43,8 +43,8 @@ export function PipelineBoard({
   }
 
   return (
-    <div className="overflow-x-auto pb-2">
-      <div className="flex min-w-max gap-2">
+    <div className="max-h-[calc(100vh-15rem)] min-h-[340px] overflow-x-auto overflow-y-hidden pb-2">
+      <div className="flex h-[calc(100vh-16rem)] min-h-[320px] min-w-max items-stretch gap-2">
         {board.stages.map((stage) => (
           <PipelineColumn
             canMoveCards={board.can_move_cards}

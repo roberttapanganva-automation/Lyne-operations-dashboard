@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import {
   createOrReuseClientInWorkspace,
   getClientByIdInWorkspace,
 } from "@/lib/clients/mutations";
+import { triggerAutomationForWorkspace } from "@/lib/n8n/client";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
 import { canCreateOperationalRecords } from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
@@ -339,6 +340,23 @@ export async function POST(request: Request) {
       },
       workspace_id: workspaceId,
     });
+
+    after(() =>
+      triggerAutomationForWorkspace({
+        automationType: "new_lead_notification",
+        payload: {
+          estimated_value: lead.estimated_value,
+          priority: lead.priority,
+          source: lead.source,
+          status: lead.status,
+          title: lead.title,
+        },
+        relatedId: lead.id,
+        relatedType: "lead",
+        supabase,
+        workspaceId,
+      }),
+    );
 
     return jsonResponse(
       {

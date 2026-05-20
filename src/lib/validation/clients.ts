@@ -30,5 +30,18 @@ export const updateClientSchema = z.object({
   source: optionalText,
 });
 
+export const importClientRowSchema = createClientSchema;
+
+export const importClientsSchema = z.object({
+  rows: z.array(importClientRowSchema).min(1).max(200),
+});
+
+export const bulkClientActionSchema = z.object({
+  action: z.literal("delete"),
+  ids: z.array(z.uuid()).min(1).max(200),
+});
+
+export type BulkClientActionInput = z.infer<typeof bulkClientActionSchema>;
 export type CreateClientInput = z.infer<typeof createClientSchema>;
+export type ImportClientRowInput = z.infer<typeof importClientRowSchema>;
 export type UpdateClientInput = z.infer<typeof updateClientSchema>;

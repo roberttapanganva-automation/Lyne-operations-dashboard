@@ -1,9 +1,10 @@
 import { CalendarList } from "@/components/calendar/CalendarList";
-import { CalendarPageHeader } from "@/components/calendar/CalendarPageHeader";
+import { AddAppointmentDialog } from "@/components/calendar/AddAppointmentDialog";
 import {
   CalendarToolbar,
   type CalendarFilter,
 } from "@/components/calendar/CalendarToolbar";
+import { Card } from "@/components/ui/Card";
 import { getAppointmentsForActiveWorkspace } from "@/lib/appointments/queries";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
 import {
@@ -107,13 +108,21 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <CalendarPageHeader canCreateRecords={canCreateRecords} />
-      <CalendarToolbar activeFilter={activeFilter} />
-      <CalendarList
-        appointments={filteredAppointments}
-        canCreateRecords={canCreateRecords}
-        canDeleteRecords={canDeleteRecords}
-      />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <CalendarToolbar activeFilter={activeFilter} />
+        </div>
+        {canCreateRecords ? (
+          <AddAppointmentDialog className="h-9 w-full shrink-0 sm:w-auto" />
+        ) : null}
+      </div>
+      <Card className="overflow-hidden">
+        <CalendarList
+          appointments={filteredAppointments}
+          canCreateRecords={canCreateRecords}
+          canDeleteRecords={canDeleteRecords}
+        />
+      </Card>
     </div>
   );
 }

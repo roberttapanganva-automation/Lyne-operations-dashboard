@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { WorkspaceRolePermission } from "@/types/domain";
 
@@ -60,18 +61,24 @@ export function RolePermissionsForm({
       >;
 
       if (!response.ok || !result.ok) {
-        setError(result.ok ? "Access rules update failed." : result.error.message);
+        const message = result.ok
+          ? "Access rules update failed."
+          : result.error.message;
+        setError(message);
+        notify.error("Access rules could not be saved", message);
         return;
       }
 
       setSuccess("Access rules updated.");
+      notify.success("Changes saved", "Access rules updated.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "Access rules update failed.",
-      );
+          : "Access rules update failed.";
+      setError(message);
+      notify.error("Access rules could not be saved", message);
     } finally {
       setIsSubmitting(false);
     }

@@ -9,6 +9,7 @@ import {
   getDateTimeRangeError,
   type DateTimeRangeValue,
 } from "@/components/ui/DateTimeRangePicker";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 
 type AddAppointmentDialogProps = {
@@ -64,6 +65,7 @@ export function AddAppointmentDialog({
 
     if (nextScheduleError) {
       setScheduleError(nextScheduleError);
+      notify.warning("Check the appointment schedule", nextScheduleError);
       return;
     }
 
@@ -95,22 +97,25 @@ export function AddAppointmentDialog({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(
-          message ?? "We could not create the appointment. Please try again.",
-        );
+        const nextError =
+          message ?? "We could not create the appointment. Please try again.";
+        setError(nextError);
+        notify.error("Appointment could not be created", nextError);
         return;
       }
 
       formRef.current?.reset();
       setSchedule({ end: null, start: null });
       setIsOpen(false);
+      notify.success("Created successfully");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const nextError =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not create the appointment. Please try again.",
-      );
+          : "We could not create the appointment. Please try again.";
+      setError(nextError);
+      notify.error("Appointment could not be created", nextError);
     } finally {
       setIsSubmitting(false);
     }

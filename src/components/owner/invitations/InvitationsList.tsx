@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { WorkspaceInvitation } from "@/types/domain";
 
@@ -48,10 +49,11 @@ export function InvitationsList({
       const link = `${window.location.origin}/invite/${invitationId}`;
       await navigator.clipboard.writeText(link);
       setMessage("Invite link copied.");
+      notify.success("Invite link copied");
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Invite link copy failed.",
-      );
+      const message = error instanceof Error ? error.message : "Invite link copy failed.";
+      setMessage(message);
+      notify.error("Invite link copy failed", message);
     } finally {
       setCopyingId(null);
     }
@@ -70,14 +72,19 @@ export function InvitationsList({
       const result = (await response.json()) as ApiResponse<{ id: string }>;
 
       if (!response.ok || !result.ok) {
-        setMessage(result.ok ? "Invite update failed." : result.error.message);
+        const message = result.ok ? "Invite update failed." : result.error.message;
+        setMessage(message);
+        notify.error("Invite could not be updated", message);
         return;
       }
 
       setMessage("Invite cancelled.");
+      notify.success("Changes saved", "Invite cancelled.");
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Invite update failed.");
+      const message = error instanceof Error ? error.message : "Invite update failed.";
+      setMessage(message);
+      notify.error("Invite could not be updated", message);
     } finally {
       setBusyId(null);
     }

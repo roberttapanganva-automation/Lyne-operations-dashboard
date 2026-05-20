@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getClientsForActiveWorkspace } from "@/lib/clients/queries";
 import { getLeadsForActiveWorkspace } from "@/lib/leads/queries";
 import { getLeadPipelineStageOptionsForActiveWorkspace } from "@/lib/pipelines/queries";
@@ -49,42 +48,10 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <div className="rounded-xl border border-[var(--ops-border)] bg-white p-2 shadow-sm">
-        <div
-          aria-label="Leads module sections"
-          className="flex flex-wrap gap-2"
-          role="tablist"
-        >
-          <Link
-            aria-selected={activeTab === "leads"}
-            className={`inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold transition ${
-              activeTab === "leads"
-                ? "bg-[var(--workspace-primary,var(--ops-primary))] text-white shadow-[0_10px_24px_var(--workspace-primary-glow,var(--ops-primary-glow))]"
-                : "text-[var(--ops-text-soft)] hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)]"
-            }`}
-            href="/leads?tab=leads"
-            role="tab"
-          >
-            Leads
-          </Link>
-          <Link
-            aria-selected={activeTab === "contacts"}
-            className={`inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold transition ${
-              activeTab === "contacts"
-                ? "bg-[var(--workspace-primary,var(--ops-primary))] text-white shadow-[0_10px_24px_var(--workspace-primary-glow,var(--ops-primary-glow))]"
-                : "text-[var(--ops-text-soft)] hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)]"
-            }`}
-            href="/leads?tab=contacts"
-            role="tab"
-          >
-            Contacts
-          </Link>
-        </div>
-      </div>
-
       {activeTab === "leads" ? (
         <>
           <LeadsList
+            activeTab={activeTab}
             canCreateRecords={canCreateRecords}
             canDeleteRecords={canDeleteRecords}
             clients={clients}
@@ -93,7 +60,12 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
           />
         </>
       ) : (
-        <ContactsPanel canCreateRecords={canCreateRecords} clients={clients} />
+        <ContactsPanel
+          activeTab={activeTab}
+          canCreateRecords={canCreateRecords}
+          canDeleteRecords={canDeleteRecords}
+          clients={clients}
+        />
       )}
     </div>
   );

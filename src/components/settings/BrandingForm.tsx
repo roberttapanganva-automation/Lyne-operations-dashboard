@@ -9,6 +9,7 @@ import {
   normalizeHexColor,
   validateHexColor,
 } from "@/lib/validation/branding";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { WorkspaceBrandingSettings } from "@/types/domain";
 
@@ -74,7 +75,9 @@ export function BrandingForm({
       !validateHexColor(normalizedPrimaryColor) ||
       !validateHexColor(normalizedAccentColor)
     ) {
-      setError("Use valid HEX colors like #6D5DFC.");
+      const errorMessage = "Use valid HEX colors like #6D5DFC.";
+      setError(errorMessage);
+      notify.warning("Check branding colors", errorMessage);
       return;
     }
 
@@ -103,20 +106,25 @@ export function BrandingForm({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not update workspace branding.");
+        const errorMessage =
+          message ?? "We could not update workspace branding.";
+        setError(errorMessage);
+        notify.error("Branding could not be saved", errorMessage);
         return;
       }
 
       setPrimaryColor(normalizedPrimaryColor);
       setAccentColor(normalizedAccentColor);
       setSuccess("Workspace branding updated.");
+      notify.success("Branding saved", "Workspace branding was updated.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not update workspace branding.",
-      );
+          : "We could not update workspace branding.";
+      setError(errorMessage);
+      notify.error("Branding could not be saved", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

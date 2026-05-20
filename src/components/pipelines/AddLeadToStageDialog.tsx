@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import { Input } from "@/components/ui/Input";
 
@@ -155,6 +156,10 @@ export function AddLeadToStageDialog({
   async function handleAddExistingLead() {
     if (!selectedExistingLeadId) {
       setError("Choose a lead from the active workspace first.");
+      notify.warning(
+        "Choose a lead first",
+        "Select an active lead before adding it to this stage.",
+      );
       return;
     }
 
@@ -177,19 +182,27 @@ export function AddLeadToStageDialog({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not add the selected lead to this stage.");
+        const nextError =
+          message ?? "We could not add the selected lead to this stage.";
+        setError(nextError);
+        notify.error("Pipeline update failed", nextError);
         return;
       }
 
       resetForm();
       setIsOpen(false);
+      notify.success(
+        "Pipeline updated",
+        "The lead was moved to the selected stage.",
+      );
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const nextError =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not add the selected lead to this stage.",
-      );
+          : "We could not add the selected lead to this stage.";
+      setError(nextError);
+      notify.error("Pipeline update failed", nextError);
     } finally {
       setIsSubmitting(false);
     }
@@ -230,19 +243,24 @@ export function AddLeadToStageDialog({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not create the lead. Please try again.");
+        const nextError =
+          message ?? "We could not create the lead. Please try again.";
+        setError(nextError);
+        notify.error("Lead could not be added", nextError);
         return;
       }
 
       resetForm();
       setIsOpen(false);
+      notify.success("Lead added", "The lead was added to your CRM.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const nextError =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not create the lead. Please try again.",
-      );
+          : "We could not create the lead. Please try again.";
+      setError(nextError);
+      notify.error("Lead could not be added", nextError);
     } finally {
       setIsSubmitting(false);
     }

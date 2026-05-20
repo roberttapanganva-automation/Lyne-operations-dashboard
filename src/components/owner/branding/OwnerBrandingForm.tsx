@@ -7,6 +7,7 @@ import { BrandingColorPicker } from "@/components/owner/branding/BrandingColorPi
 import { BrandingPreviewCard } from "@/components/owner/branding/BrandingPreviewCard";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { notify } from "@/lib/ui/toast";
 import { normalizeHexColor, validateHexColor } from "@/lib/validation/branding";
 import type { ApiResponse } from "@/types/api";
 import type { ThemeMode, WorkspaceBrandingSettings } from "@/types/domain";
@@ -51,7 +52,9 @@ export function OwnerBrandingForm({
       !validateHexColor(normalizedPrimaryColor) ||
       !validateHexColor(normalizedAccentColor)
     ) {
-      setError("Use valid HEX colors like #6D5DFC.");
+      const errorMessage = "Use valid HEX colors like #6D5DFC.";
+      setError(errorMessage);
+      notify.warning("Check branding colors", errorMessage);
       setIsSubmitting(false);
       return;
     }
@@ -76,20 +79,26 @@ export function OwnerBrandingForm({
       const result = (await response.json()) as ApiResponse<WorkspaceBrandingSettings>;
 
       if (!response.ok || !result.ok) {
-        setError(result.ok ? "Branding update failed." : result.error.message);
+        const errorMessage = result.ok
+          ? "Branding update failed."
+          : result.error.message;
+        setError(errorMessage);
+        notify.error("Branding could not be saved", errorMessage);
         return;
       }
 
       setPrimaryColor(normalizedPrimaryColor);
       setAccentColor(normalizedAccentColor);
       setSuccess("Workspace branding saved.");
+      notify.success("Branding saved", "Workspace branding was updated.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "Branding update failed.",
-      );
+          : "Branding update failed.";
+      setError(errorMessage);
+      notify.error("Branding could not be saved", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

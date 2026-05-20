@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 
 type AddTaskDialogProps = {
@@ -80,7 +81,10 @@ export function AddTaskDialog({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not create the task. Please try again.");
+        const errorMessage =
+          message ?? "We could not create the task. Please try again.";
+        setError(errorMessage);
+        notify.error("Task could not be added", errorMessage);
         return;
       }
 
@@ -88,13 +92,15 @@ export function AddTaskDialog({
       setDueDate(undefined);
       setDueTime("");
       setIsOpen(false);
+      notify.success("Task added", "The task was added to your workspace.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not create the task. Please try again.",
-      );
+          : "We could not create the task. Please try again.";
+      setError(errorMessage);
+      notify.error("Task could not be added", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

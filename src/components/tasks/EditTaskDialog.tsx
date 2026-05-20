@@ -5,10 +5,14 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { TaskListItem } from "./TasksList";
 
 type EditTaskDialogProps = {
+  hideTrigger?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  open?: boolean;
   task: TaskListItem;
 };
 
@@ -51,14 +55,29 @@ function getErrorMessage(response: ApiResponse<UpdatedTask>) {
   return response.error.message;
 }
 
-export function EditTaskDialog({ task }: EditTaskDialogProps) {
+export function EditTaskDialog({
+  hideTrigger = false,
+  onOpenChange,
+  open,
+  task,
+}: EditTaskDialogProps) {
   const router = useRouter();
   const initialDue = splitDateTime(task.due_at);
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState<Date | undefined>(initialDue.date);
   const [dueTime, setDueTime] = useState(initialDue.time);
+  const isOpen = open ?? internalOpen;
+
+  function setDialogOpen(nextOpen: boolean) {
+    if (onOpenChange) {
+      onOpenChange(nextOpen);
+      return;
+    }
+
+    setInternalOpen(nextOpen);
+  }
 
   function closeDialog() {
     if (isSubmitting) {
@@ -66,7 +85,7 @@ export function EditTaskDialog({ task }: EditTaskDialogProps) {
     }
 
     setError(null);
-    setIsOpen(false);
+    setDialogOpen(false);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -100,18 +119,23 @@ export function EditTaskDialog({ task }: EditTaskDialogProps) {
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not update the task. Please try again.");
+        const errorMessage =
+          message ?? "We could not update the task. Please try again.";
+        setError(errorMessage);
+        notify.error("Task could not be updated", errorMessage);
         return;
       }
 
-      setIsOpen(false);
+      setDialogOpen(false);
+      notify.success("Task updated", "The task details were saved.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not update the task. Please try again.",
-      );
+          : "We could not update the task. Please try again.";
+      setError(errorMessage);
+      notify.error("Task could not be updated", errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -119,15 +143,17 @@ export function EditTaskDialog({ task }: EditTaskDialogProps) {
 
   return (
     <>
-      <button
-        aria-label={`Edit task ${task.title}`}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--ops-border)] bg-white text-[var(--workspace-primary,var(--ops-primary-dark))] shadow-sm transition hover:bg-[var(--workspace-primary-soft,var(--ops-primary-soft))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--workspace-primary,var(--ops-primary))]"
-        onClick={() => setIsOpen(true)}
-        title="Edit task"
-        type="button"
-      >
-        <PencilSimpleLineIcon aria-hidden="true" size={18} weight="regular" />
-      </button>
+      {hideTrigger ? null : (
+        <button
+          aria-label={`Edit task ${task.title}`}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--ops-border)] bg-white text-[var(--workspace-primary,var(--ops-primary-dark))] shadow-sm transition hover:bg-[var(--workspace-primary-soft,var(--ops-primary-soft))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--workspace-primary,var(--ops-primary))]"
+          onClick={() => setDialogOpen(true)}
+          title="Edit task"
+          type="button"
+        >
+          <PencilSimpleLineIcon aria-hidden="true" size={18} weight="regular" />
+        </button>
+      )}
 
       {isOpen ? (
         <div
