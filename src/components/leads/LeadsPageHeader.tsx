@@ -41,7 +41,7 @@ export function LeadsPageHeader({
             </span>
           </div>
           <p className="mt-4 max-w-3xl text-sm leading-6 text-[var(--ops-text-soft)]">
-            Manage the opportunities that need attention next, from first contact through qualification and follow-up.
+            Capture new opportunities, track lead progress, and move prospects through your sales pipeline.
           </p>
         </div>
 

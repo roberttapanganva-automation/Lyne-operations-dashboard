@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/Badge";
+import { useMemo, useState } from "react";
+import { AssignmentSelect } from "@/components/assignments/AssignmentSelect";
 import { BulkActionBar } from "@/components/ui/BulkActionBar";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { DateTimeCell, DateTimeHeader } from "@/components/ui/DateTimeCell";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
+import type { AssignableWorkspaceMember } from "@/types/domain";
 import { EditTaskDialog } from "./EditTaskDialog";
 import { TaskActions } from "./TaskActions";
 import { TaskPriorityBadge, type TaskPriority } from "./TaskPriorityBadge";
@@ -17,11 +17,8 @@ import { TasksEmptyState } from "./TasksEmptyState";
 export type TaskRelatedType = "lead" | "job" | "client" | "general";
 
 export type TaskListItem = {
-  assigned_to: string | null;
-  assigned_user: {
-    full_name: string | null;
-    id: string;
-  } | null;
+  assigned_member: AssignableWorkspaceMember | null;
+  assigned_member_id: string | null;
   completed_at: string | null;
   created_at: string;
   description: string | null;
@@ -35,10 +32,18 @@ export type TaskListItem = {
 };
 
 type TasksListProps = {
+  canAssignRecords: boolean;
   canCreateRecords: boolean;
   canDeleteRecords: boolean;
   canUpdateRecords: boolean;
   emptyStateVariant?: "filtered" | "workspace";
+  onTaskCreated?: (task: TaskListItem) => void;
+  onTaskStatusOptimistic?: (
+    task: TaskListItem,
+    nextStatus: "done" | "todo",
+  ) => (() => void) | void;
+  onTaskUpdated?: (task: TaskListItem) => void;
+  onTasksDeleted?: (taskIds: string[]) => void;
   tasks: TaskListItem[];
 };
 
@@ -73,28 +78,29 @@ function formatRelatedType(value: TaskRelatedType) {
 }
 
 export function TasksList({
+  canAssignRecords,
   canCreateRecords,
   canDeleteRecords,
   canUpdateRecords,
   emptyStateVariant = "workspace",
+  onTaskCreated,
+  onTaskStatusOptimistic,
+  onTaskUpdated,
+  onTasksDeleted,
   tasks,
 }: TasksListProps) {
-  const router = useRouter();
   const [editingTask, setEditingTask] = useState<TaskListItem | null>(null);
-  const [visibleTasks, setVisibleTasks] = useState(tasks);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const visibleTaskIds = useMemo(
+    () => new Set(tasks.map((task) => task.id)),
+    [tasks],
+  );
+  const visibleSelectedIds = selectedIds.filter((id) => visibleTaskIds.has(id));
 
-  useEffect(() => {
-    setVisibleTasks(tasks);
-    setSelectedIds((current) =>
-      current.filter((id) => tasks.some((task) => task.id === id)),
-    );
-  }, [tasks]);
-
-  if (visibleTasks.length === 0) {
+  if (tasks.length === 0) {
     if (emptyStateVariant === "filtered") {
       return (
         <div className="px-5 py-10 text-center sm:px-6">
@@ -108,7 +114,13 @@ export function TasksList({
       );
     }
 
-    return <TasksEmptyState canCreateRecords={canCreateRecords} />;
+    return (
+      <TasksEmptyState
+        canAssignRecords={canAssignRecords}
+        canCreateRecords={canCreateRecords}
+        onTaskCreated={onTaskCreated}
+      />
+    );
   }
 
   function openTaskEditor(task: TaskListItem) {
@@ -120,8 +132,7 @@ export function TasksList({
   }
 
   const allSelected =
-    visibleTasks.length > 0 &&
-    visibleTasks.every((task) => selectedIds.includes(task.id));
+    tasks.length > 0 && tasks.every((task) => selectedIds.includes(task.id));
 
   function toggleSelectAll() {
     if (allSelected) {
@@ -129,7 +140,7 @@ export function TasksList({
       return;
     }
 
-    setSelectedIds(visibleTasks.map((task) => task.id));
+    setSelectedIds(tasks.map((task) => task.id));
   }
 
   function toggleTaskSelection(taskId: string) {
@@ -153,7 +164,7 @@ export function TasksList({
       const response = await fetch("/api/tasks/bulk", {
         body: JSON.stringify({
           action: "delete",
-          ids: selectedIds,
+          ids: visibleSelectedIds,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -171,10 +182,8 @@ export function TasksList({
         return;
       }
 
-      const deletedIds = new Set(result.data.deleted.map((task) => task.id));
-      setVisibleTasks((current) =>
-        current.filter((task) => !deletedIds.has(task.id)),
-      );
+      const deletedIds = result.data.deleted.map((task) => task.id);
+      onTasksDeleted?.(deletedIds);
       notify.success(
         result.data.deletedCount === 1 ? "Task deleted" : "Tasks deleted",
         result.data.deletedCount === 1
@@ -183,7 +192,6 @@ export function TasksList({
       );
       clearSelection();
       setBulkDeleteOpen(false);
-      router.refresh();
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
@@ -198,7 +206,7 @@ export function TasksList({
 
   return (
     <>
-      {canDeleteRecords && selectedIds.length > 0 ? (
+      {canDeleteRecords && visibleSelectedIds.length > 0 ? (
         <div className="border-b border-[var(--ops-border)] px-5 py-3 sm:px-6">
           <BulkActionBar
             canDelete
@@ -206,7 +214,7 @@ export function TasksList({
             entityLabel="task"
             onClearSelection={clearSelection}
             onDelete={() => setBulkDeleteOpen(true)}
-            selectedCount={selectedIds.length}
+            selectedCount={visibleSelectedIds.length}
           />
           {bulkDeleteError ? (
             <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--ops-danger)]">
@@ -215,7 +223,7 @@ export function TasksList({
           ) : null}
         </div>
       ) : null}
-      <div className="hidden overflow-x-auto xl:block">
+      <div className="ops-density-surface hidden overflow-x-auto xl:block">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--ops-card-soft)] text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
             <tr>
@@ -240,6 +248,9 @@ export function TasksList({
                 Priority
               </th>
               <th className="px-5 py-3" scope="col">
+                Assigned to
+              </th>
+              <th className="px-5 py-3" scope="col">
                 <DateTimeHeader label="Due" />
               </th>
               <th className="px-5 py-3" scope="col">
@@ -254,7 +265,7 @@ export function TasksList({
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--ops-border)] bg-white">
-            {visibleTasks.map((task) => {
+            {tasks.map((task) => {
               const overdue = isTaskOverdue(task);
 
               return (
@@ -287,16 +298,22 @@ export function TasksList({
                     ) : null}
                   </td>
                   <td className="px-5 py-4">
-                    <TaskStatusBadge status={task.status} />
+                    <TaskStatusBadge isOverdue={overdue} status={task.status} />
                   </td>
                   <td className="px-5 py-4">
                     <TaskPriorityBadge priority={task.priority} />
                   </td>
+                  <td className="px-5 py-4">
+                    <AssignmentSelect
+                      assignedMember={task.assigned_member}
+                      assignedMemberId={task.assigned_member_id}
+                      canAssign={canAssignRecords}
+                      recordId={task.id}
+                      targetType="task"
+                    />
+                  </td>
                   <td className="px-5 py-4 text-[var(--ops-text-soft)]">
-                    <div className="space-y-1">
-                      <DateTimeCell emptyLabel="No due date" value={task.due_at} />
-                      {overdue ? <Badge variant="danger">Overdue</Badge> : null}
-                    </div>
+                    <DateTimeCell emptyLabel="No due date" value={task.due_at} />
                   </td>
                   <td className="px-5 py-4 text-[var(--ops-text-soft)]">
                     {formatRelatedType(task.related_type)}
@@ -308,6 +325,7 @@ export function TasksList({
                     <div onDoubleClick={(event) => event.stopPropagation()}>
                       <TaskActions
                         canUpdateStatus={canUpdateRecords}
+                        onTaskStatusOptimistic={onTaskStatusOptimistic}
                         task={task}
                       />
                     </div>
@@ -320,12 +338,12 @@ export function TasksList({
       </div>
 
       <div className="divide-y divide-[var(--ops-border)] xl:hidden">
-        {visibleTasks.map((task) => {
+        {tasks.map((task) => {
           const overdue = isTaskOverdue(task);
 
           return (
             <article
-              className={canCreateRecords ? "cursor-pointer p-5 transition hover:bg-[var(--ops-card-soft)]" : "p-5"}
+              className={canCreateRecords ? "ops-density-card cursor-pointer p-5 transition hover:bg-[var(--ops-card-soft)]" : "ops-density-card p-5"}
               key={task.id}
               onDoubleClick={() => openTaskEditor(task)}
               title={canCreateRecords ? "Double-click to edit task" : undefined}
@@ -351,10 +369,24 @@ export function TasksList({
                     </p>
                   ) : null}
                 </div>
-                <TaskStatusBadge status={task.status} />
+                <TaskStatusBadge isOverdue={overdue} status={task.status} />
               </div>
 
               <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
+                    Assigned to
+                  </p>
+                  <div className="mt-1">
+                    <AssignmentSelect
+                      assignedMember={task.assigned_member}
+                      assignedMemberId={task.assigned_member_id}
+                      canAssign={canAssignRecords}
+                      recordId={task.id}
+                      targetType="task"
+                    />
+                  </div>
+                </div>
                 <div>
                   <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
                     Priority
@@ -367,9 +399,8 @@ export function TasksList({
                   <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
                     Due
                   </p>
-                  <div className="mt-1 space-y-1 text-[var(--ops-text-soft)]">
+                  <div className="mt-1 text-[var(--ops-text-soft)]">
                     <DateTimeCell emptyLabel="No due date" value={task.due_at} />
-                    {overdue ? <Badge variant="danger">Overdue</Badge> : null}
                   </div>
                 </div>
                 <div>
@@ -396,6 +427,7 @@ export function TasksList({
               >
                 <TaskActions
                   canUpdateStatus={canUpdateRecords}
+                  onTaskStatusOptimistic={onTaskStatusOptimistic}
                   task={task}
                 />
               </div>
@@ -404,24 +436,26 @@ export function TasksList({
         })}
       </div>
       {editingTask ? (
-        <EditTaskDialog
-          hideTrigger
-          onOpenChange={(open) => {
-            if (!open) {
-              setEditingTask(null);
-            }
-          }}
-          open
-          task={editingTask}
-        />
+      <EditTaskDialog
+        canAssignRecords={canAssignRecords}
+        hideTrigger
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingTask(null);
+          }
+        }}
+        onTaskUpdated={onTaskUpdated}
+        open
+        task={editingTask}
+      />
       ) : null}
       <ConfirmDeleteDialog
         confirmLabel={
-          selectedIds.length === 1 ? "Delete task" : "Delete tasks"
+          visibleSelectedIds.length === 1 ? "Delete task" : "Delete tasks"
         }
         description="This will permanently remove the selected task records from this workspace. Use this only for abandoned, cancelled, duplicate, or incorrectly added tasks."
         isSubmitting={isBulkDeleting}
-        itemCount={selectedIds.length}
+        itemCount={visibleSelectedIds.length}
         onCancel={() => setBulkDeleteOpen(false)}
         onConfirm={deleteSelectedTasks}
         open={bulkDeleteOpen}

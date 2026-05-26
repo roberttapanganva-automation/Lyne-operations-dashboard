@@ -10,6 +10,7 @@ import {
   ShieldCheckIcon,
   SlidersHorizontalIcon,
   SquaresFourIcon,
+  TargetIcon,
   UsersThreeIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
@@ -26,6 +27,7 @@ const ownerNavItems = [
   { href: "/owner/branding", label: "Branding", Icon: PaintBrushIcon },
   { href: "/owner/modules", label: "Modules", Icon: SlidersHorizontalIcon },
   { href: "/owner/pipeline", label: "Pipeline", Icon: ListChecksIcon },
+  { href: "/owner/assignments", label: "Assignments", Icon: TargetIcon },
   { href: "/owner/access-rules", label: "Access Rules", Icon: ShieldCheckIcon },
   { href: "/owner/audit-logs", label: "Audit Logs", Icon: GearSixIcon },
 ] as const;

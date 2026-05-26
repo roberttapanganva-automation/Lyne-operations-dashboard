@@ -1,7 +1,6 @@
 "use client";
 
 import { ArrowCounterClockwiseIcon, CheckIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { notify } from "@/lib/ui/toast";
@@ -10,6 +9,10 @@ import type { TaskListItem } from "./TasksList";
 
 type TaskActionsProps = {
   canUpdateStatus: boolean;
+  onTaskStatusOptimistic?: (
+    task: TaskListItem,
+    nextStatus: "done" | "todo",
+  ) => (() => void) | void;
   task: TaskListItem;
 };
 
@@ -25,8 +28,11 @@ function getErrorMessage(response: ApiResponse<UpdatedTask>) {
   return response.error.message;
 }
 
-export function TaskActions({ canUpdateStatus, task }: TaskActionsProps) {
-  const router = useRouter();
+export function TaskActions({
+  canUpdateStatus,
+  onTaskStatusOptimistic,
+  task,
+}: TaskActionsProps) {
   const status = task.status;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +40,7 @@ export function TaskActions({ canUpdateStatus, task }: TaskActionsProps) {
   async function updateStatus(nextStatus: "done" | "todo") {
     setError(null);
     setIsLoading(true);
+    const rollback = onTaskStatusOptimistic?.(task, nextStatus);
 
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
@@ -49,6 +56,7 @@ export function TaskActions({ canUpdateStatus, task }: TaskActionsProps) {
       if (!response.ok || message) {
         const errorMessage =
           message ?? "We could not update the task. Please try again.";
+        rollback?.();
         setError(errorMessage);
         notify.error("Task update failed", errorMessage);
         return;
@@ -60,12 +68,12 @@ export function TaskActions({ canUpdateStatus, task }: TaskActionsProps) {
           ? "The task was moved to history."
           : "The task was moved back to active work.",
       );
-      router.refresh();
     } catch (caughtError) {
       const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
           : "We could not update the task. Please try again.";
+      rollback?.();
       setError(errorMessage);
       notify.error("Task update failed", errorMessage);
     } finally {
@@ -78,10 +86,10 @@ export function TaskActions({ canUpdateStatus, task }: TaskActionsProps) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className={`space-y-2 transition ${isLoading ? "opacity-70" : ""}`}>
       <Button
         aria-label={status === "done" ? "Reopen task" : "Mark task as done"}
-        className={`h-9 min-w-24 rounded-lg px-3 text-sm font-semibold ${
+        className={`h-9 min-w-24 justify-center gap-2.5 rounded-lg px-3 text-sm font-semibold leading-none ${
           status === "done"
             ? "border-[var(--ops-success)] bg-[var(--ops-success-soft)] text-[var(--ops-success)]"
             : "border-[var(--ops-success)]/35 bg-[var(--ops-success-soft)] text-[var(--ops-success)] hover:border-[var(--ops-success)] hover:bg-[var(--ops-success)] hover:text-white"
@@ -92,15 +100,17 @@ export function TaskActions({ canUpdateStatus, task }: TaskActionsProps) {
         type="button"
         variant="secondary"
       >
-        {status === "done" ? (
-          <ArrowCounterClockwiseIcon
-            aria-hidden="true"
-            size={16}
-            weight="bold"
-          />
-        ) : (
-          <CheckIcon aria-hidden="true" size={16} weight="bold" />
-        )}
+        <span className="inline-flex items-center justify-center">
+          {status === "done" ? (
+            <ArrowCounterClockwiseIcon
+              aria-hidden="true"
+              size={16}
+              weight="bold"
+            />
+          ) : (
+            <CheckIcon aria-hidden="true" size={16} weight="bold" />
+          )}
+        </span>
         <span className="sr-only">
           {isLoading
             ? "Updating task"
@@ -108,8 +118,8 @@ export function TaskActions({ canUpdateStatus, task }: TaskActionsProps) {
               ? "Reopen task"
               : "Mark task as done"}
         </span>
-        <span aria-hidden="true">
-          {isLoading ? "Saving" : status === "done" ? "Reopen" : "Done"}
+        <span aria-hidden="true" className="inline-flex items-center">
+          {isLoading ? "Saving..." : status === "done" ? "Reopen" : "Done"}
         </span>
       </Button>
       {error ? (

@@ -11,7 +11,7 @@ import {
   ShieldCheckIcon,
   UsersThreeIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import type { ActivityIconKey } from "@/lib/activity/presentation";
 
@@ -31,6 +31,68 @@ type NotificationButtonProps = {
 const readNotificationsKey = "opspilot:read-notifications";
 const readAllTimestampKey = "opspilot:notifications-read-all-at";
 const notificationLifetimeInDays = 3;
+const notificationStorageEvent = "opspilot:notifications-storage";
+
+function getStoredNotificationSnapshot() {
+  if (typeof window === "undefined") {
+    return JSON.stringify({ readAllAt: 0, readIds: [] });
+  }
+
+  try {
+    const storedReadAll = window.localStorage.getItem(readAllTimestampKey);
+    const storedReadIds = window.localStorage.getItem(readNotificationsKey);
+
+    return JSON.stringify({
+      readAllAt: storedReadAll ? Number.parseInt(storedReadAll, 10) || 0 : 0,
+      readIds: storedReadIds ? (JSON.parse(storedReadIds) as string[]) : [],
+    });
+  } catch {
+    return JSON.stringify({ readAllAt: 0, readIds: [] });
+  }
+}
+
+function subscribeToNotificationStorage(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(notificationStorageEvent, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(notificationStorageEvent, onStoreChange);
+  };
+}
+
+function parseStoredNotificationSnapshot(snapshot: string) {
+  try {
+    const parsed = JSON.parse(snapshot) as {
+      readAllAt?: unknown;
+      readIds?: unknown;
+    };
+
+    return {
+      readAllAt:
+        typeof parsed.readAllAt === "number" && Number.isFinite(parsed.readAllAt)
+          ? parsed.readAllAt
+          : 0,
+      readIds: new Set(
+        Array.isArray(parsed.readIds)
+          ? parsed.readIds.filter((id): id is string => typeof id === "string")
+          : [],
+      ),
+    };
+  } catch {
+    return { readAllAt: 0, readIds: new Set<string>() };
+  }
+}
+
+function emitNotificationStorageChange() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(notificationStorageEvent));
+  }
+}
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -87,31 +149,15 @@ export function NotificationButton({ items }: NotificationButtonProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [mountedAt] = useState(() => Date.now());
-  const [readAllAt, setReadAllAt] = useState<number>(() => {
-    if (typeof window === "undefined") {
-      return 0;
-    }
-
-    try {
-      const storedValue = window.localStorage.getItem(readAllTimestampKey);
-      return storedValue ? Number.parseInt(storedValue, 10) || 0 : 0;
-    } catch {
-      return 0;
-    }
-  });
-  const [readIds, setReadIds] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") {
-      return new Set();
-    }
-
-    try {
-      const storedValue = window.localStorage.getItem(readNotificationsKey);
-      const storedIds = storedValue ? (JSON.parse(storedValue) as string[]) : [];
-      return new Set(storedIds);
-    } catch {
-      return new Set();
-    }
-  });
+  const notificationSnapshot = useSyncExternalStore(
+    subscribeToNotificationStorage,
+    getStoredNotificationSnapshot,
+    () => JSON.stringify({ readAllAt: 0, readIds: [] }),
+  );
+  const { readAllAt, readIds } = useMemo(
+    () => parseStoredNotificationSnapshot(notificationSnapshot),
+    [notificationSnapshot],
+  );
   const cutoffTimestamp =
     mountedAt - notificationLifetimeInDays * 24 * 60 * 60 * 1000;
   const visibleItems = items.filter((item) => {
@@ -144,8 +190,6 @@ export function NotificationButton({ items }: NotificationButtonProps) {
   }, []);
 
   function persistReadIds(nextReadIds: Set<string>) {
-    setReadIds(nextReadIds);
-
     try {
       window.localStorage.setItem(
         readNotificationsKey,
@@ -154,16 +198,18 @@ export function NotificationButton({ items }: NotificationButtonProps) {
     } catch {
       // Keep the in-memory read state even if localStorage is unavailable.
     }
+
+    emitNotificationStorageChange();
   }
 
   function persistReadAllAt(nextReadAllAt: number) {
-    setReadAllAt(nextReadAllAt);
-
     try {
       window.localStorage.setItem(readAllTimestampKey, String(nextReadAllAt));
     } catch {
       // Keep the in-memory read timestamp even if localStorage is unavailable.
     }
+
+    emitNotificationStorageChange();
   }
 
   function markAllAsRead() {
@@ -212,7 +258,11 @@ export function NotificationButton({ items }: NotificationButtonProps) {
       <button
         aria-expanded={isOpen}
         aria-label="Notifications"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--ops-border)] bg-white text-[var(--ops-text-soft)] shadow-sm transition hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--ops-text-soft)] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)] ${
+          isOpen
+            ? "bg-[var(--ops-card-soft)] text-[var(--ops-text)]"
+            : "bg-transparent hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)]"
+        }`}
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >
@@ -239,7 +289,7 @@ export function NotificationButton({ items }: NotificationButtonProps) {
       </button>
 
       {isOpen ? (
-        <div className="fixed right-4 top-16 z-50 w-[min(calc(100vw-2rem),24rem)] overflow-hidden rounded-xl border border-[var(--ops-border)] bg-[var(--ops-card)] p-3 shadow-lg sm:right-6 lg:absolute lg:right-0 lg:top-full lg:mt-2 lg:w-[25rem]">
+        <div className="fixed right-4 top-16 z-50 flex max-h-[min(32rem,calc(100vh-5rem))] w-[min(calc(100vw-2rem),24rem)] flex-col overflow-hidden rounded-xl border border-[var(--ops-border)] bg-[var(--ops-card)] p-3 shadow-lg sm:right-6 lg:absolute lg:right-0 lg:top-full lg:mt-2 lg:w-[25rem]">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-[var(--ops-text)]">
               Notifications
@@ -263,7 +313,7 @@ export function NotificationButton({ items }: NotificationButtonProps) {
               No notifications yet.
             </p>
           ) : (
-            <ul className="mt-3 max-h-[min(56vh,24rem)] space-y-1.5 overflow-y-auto pr-1">
+            <ul className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
               {visibleItems.map((item) => {
                 const itemTimestamp = getNotificationTimestamp(item);
                 const readKey = getNotificationReadKey(item);

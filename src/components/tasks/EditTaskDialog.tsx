@@ -1,24 +1,36 @@
 "use client";
 
 import { PencilSimpleLineIcon, XIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { AssignmentMemberField } from "@/components/assignments/AssignmentMemberField";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { TaskListItem } from "./TasksList";
 
 type EditTaskDialogProps = {
+  canAssignRecords?: boolean;
   hideTrigger?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onTaskUpdated?: (task: TaskListItem) => void;
   open?: boolean;
   task: TaskListItem;
 };
 
-type UpdatedTask = {
-  id: string;
-};
+type UpdatedTask = Pick<
+  TaskListItem,
+  | "assigned_member"
+  | "assigned_member_id"
+  | "completed_at"
+  | "description"
+  | "due_at"
+  | "id"
+  | "priority"
+  | "related_type"
+  | "status"
+  | "title"
+>;
 
 function splitDateTime(value: string | null) {
   if (!value) {
@@ -47,21 +59,14 @@ function formatLocalDate(value: Date | undefined) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
 }
 
-function getErrorMessage(response: ApiResponse<UpdatedTask>) {
-  if (response.ok) {
-    return null;
-  }
-
-  return response.error.message;
-}
-
 export function EditTaskDialog({
+  canAssignRecords = false,
   hideTrigger = false,
   onOpenChange,
+  onTaskUpdated,
   open,
   task,
 }: EditTaskDialogProps) {
-  const router = useRouter();
   const initialDue = splitDateTime(task.due_at);
   const [internalOpen, setInternalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,6 +108,9 @@ export function EditTaskDialog({
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         body: JSON.stringify({
+          assigned_member_id: canAssignRecords
+            ? String(formData.get("assigned_member_id") ?? "") || null
+            : undefined,
           description: String(formData.get("description") ?? ""),
           due_at: dueAt,
           priority: String(formData.get("priority") ?? task.priority),
@@ -116,19 +124,39 @@ export function EditTaskDialog({
         method: "PATCH",
       });
       const result = (await response.json()) as ApiResponse<UpdatedTask>;
-      const message = getErrorMessage(result);
 
-      if (!response.ok || message) {
+      if (!response.ok || !result.ok) {
         const errorMessage =
-          message ?? "We could not update the task. Please try again.";
+          result.ok
+            ? "We could not update the task. Please try again."
+            : result.error.message;
         setError(errorMessage);
         notify.error("Task could not be updated", errorMessage);
         return;
       }
 
+      const updatedTask = result.data;
+
       setDialogOpen(false);
+      onTaskUpdated?.({
+        ...task,
+        assigned_member:
+          updatedTask.assigned_member === undefined
+            ? task.assigned_member
+            : updatedTask.assigned_member,
+        assigned_member_id:
+          updatedTask.assigned_member_id === undefined
+            ? task.assigned_member_id
+            : updatedTask.assigned_member_id,
+        completed_at: updatedTask.completed_at,
+        description: updatedTask.description ?? null,
+        due_at: updatedTask.due_at ?? null,
+        priority: updatedTask.priority ?? task.priority,
+        related_type: updatedTask.related_type ?? task.related_type,
+        status: updatedTask.status,
+        title: updatedTask.title,
+      });
       notify.success("Task updated", "The task details were saved.");
-      router.refresh();
     } catch (caughtError) {
       const errorMessage =
         caughtError instanceof Error
@@ -302,6 +330,13 @@ export function EditTaskDialog({
                     <option value="client">Client</option>
                   </select>
                 </div>
+                <AssignmentMemberField
+                  assignedMember={task.assigned_member}
+                  canAssign={canAssignRecords}
+                  defaultValue={task.assigned_member_id}
+                  disabled={isSubmitting}
+                  id={`edit-task-assigned-member-${task.id}`}
+                />
               </div>
 
               <div>

@@ -24,6 +24,12 @@ const optionalUuid = z.preprocess(
   z.uuid().optional(),
 );
 
+const optionalNullableUuid = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? null : value,
+  z.uuid().nullable().optional(),
+);
+
 export const taskStatusSchema = z.enum([
   "todo",
   "in_progress",
@@ -32,6 +38,7 @@ export const taskStatusSchema = z.enum([
 ]);
 
 export const createTaskSchema = z.object({
+  assigned_member_id: optionalNullableUuid,
   description: optionalText,
   due_at: optionalDateTime,
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
@@ -48,6 +55,7 @@ export const updateTaskStatusSchema = z.object({
 export const updateTaskSchema = z
   .object({
     description: optionalText,
+    assigned_member_id: optionalNullableUuid,
     due_at: optionalDateTime,
     priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
     related_id: optionalUuid,

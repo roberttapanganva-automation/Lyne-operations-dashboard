@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAvatarExtension, resolveAccountAvatarUrl } from "@/lib/account/avatar";
+import { revalidateAccountPages } from "@/lib/cache/revalidate-app";
 import { createClient } from "@/lib/supabase/server";
 import type { ApiResponse } from "@/types/api";
 
@@ -203,6 +204,8 @@ export async function POST(request: Request) {
     supabase,
   });
 
+  revalidateAccountPages();
+
   return jsonResponse({
     data: {
       avatar_url: avatarUrl,
@@ -294,6 +297,8 @@ export async function DELETE() {
       500,
     );
   }
+
+  revalidateAccountPages();
 
   return jsonResponse({
     data: {

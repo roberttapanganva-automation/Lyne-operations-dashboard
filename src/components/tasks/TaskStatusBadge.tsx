@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/Badge";
 export type TaskStatus = "todo" | "in_progress" | "done" | "cancelled";
 
 type TaskStatusBadgeProps = {
+  isOverdue?: boolean;
   status: TaskStatus;
 };
 
@@ -31,7 +32,14 @@ const statusConfig: Record<
   },
 };
 
-export function TaskStatusBadge({ status }: TaskStatusBadgeProps) {
+export function TaskStatusBadge({
+  isOverdue = false,
+  status,
+}: TaskStatusBadgeProps) {
+  if (isOverdue && status !== "done" && status !== "cancelled") {
+    return <Badge variant="danger">Overdue</Badge>;
+  }
+
   const config = statusConfig[status];
 
   return <Badge variant={config.variant}>{config.label}</Badge>;

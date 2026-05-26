@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateClientPages } from "@/lib/cache/revalidate-app";
 import { ZodError } from "zod";
 import { getClientsForActiveWorkspace } from "@/lib/clients/queries";
 import { createOrReuseClientInWorkspace } from "@/lib/clients/mutations";
@@ -179,6 +180,8 @@ export async function POST(request: Request) {
         workspace_id: activeWorkspace.context.workspace.id,
       });
     }
+
+    revalidateClientPages();
 
     return jsonResponse(
       {

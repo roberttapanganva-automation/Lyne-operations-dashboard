@@ -1,12 +1,19 @@
 import { AddJobDialog } from "./AddJobDialog";
 import { FunnelSimpleIcon, MagnifyingGlassIcon } from "@phosphor-icons/react/ssr";
 import { Input } from "@/components/ui/Input";
+import type { JobListItem } from "./JobsList";
 
 type JobsToolbarProps = {
+  canAssignRecords: boolean;
   canCreateRecords: boolean;
+  onJobCreated?: (job: JobListItem) => void;
 };
 
-export function JobsToolbar({ canCreateRecords }: JobsToolbarProps) {
+export function JobsToolbar({
+  canAssignRecords,
+  canCreateRecords,
+  onJobCreated,
+}: JobsToolbarProps) {
   return (
     <section className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px_auto]">
       <Input
@@ -73,7 +80,11 @@ export function JobsToolbar({ canCreateRecords }: JobsToolbarProps) {
 
       <div className="flex items-center justify-start lg:justify-end">
         {canCreateRecords ? (
-          <AddJobDialog className="h-9 w-full lg:w-auto" />
+          <AddJobDialog
+            canAssignRecords={canAssignRecords}
+            className="h-9 w-full lg:w-auto"
+            onJobCreated={onJobCreated}
+          />
         ) : null}
       </div>
     </section>

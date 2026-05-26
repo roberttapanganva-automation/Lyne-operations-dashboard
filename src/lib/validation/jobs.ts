@@ -48,8 +48,15 @@ const optionalDateTime = z.preprocess((value) => {
   return value;
 }, z.string().refine((value) => !Number.isNaN(Date.parse(value)), "Enter a valid schedule date.").optional());
 
+const optionalNullableUuid = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? null : value,
+  z.uuid().nullable().optional(),
+);
+
 export const createJobSchema = z.object({
   actual_value: optionalNullableNumber,
+  assigned_member_id: optionalNullableUuid,
   client_email: optionalEmail,
   client_name: optionalText,
   client_phone: optionalText,
@@ -70,6 +77,7 @@ export const createJobSchema = z.object({
 });
 
 export const updateJobSchema = z.object({
+  assigned_member_id: optionalNullableUuid,
   estimated_value: optionalNumber.default(0),
   location: optionalText,
   payment_status: z

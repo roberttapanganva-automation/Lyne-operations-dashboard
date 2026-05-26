@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateClientPages } from "@/lib/cache/revalidate-app";
 import { z, ZodError } from "zod";
 import { canEditOperationalRecords } from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
@@ -202,6 +203,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
       workspace_id: workspaceId,
     });
+
+    revalidateClientPages();
 
     return jsonResponse({
       data: client,

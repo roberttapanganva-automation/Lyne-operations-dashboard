@@ -1,18 +1,29 @@
 import { after, NextResponse } from "next/server";
+import { revalidateLeadPages, revalidateTaskPages } from "@/lib/cache/revalidate-app";
 import { ZodError } from "zod";
+import {
+  autoAssignRecordRoundRobin,
+  getAssignableMember,
+  getAssignmentFields,
+} from "@/lib/assignments/engine";
 import {
   createOrReuseClientInWorkspace,
   getClientByIdInWorkspace,
 } from "@/lib/clients/mutations";
 import { triggerAutomationForWorkspace } from "@/lib/n8n/client";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
-import { canCreateOperationalRecords } from "@/lib/permissions/workspace";
+import {
+  canAssignOperationalRecords,
+  canCreateOperationalRecords,
+} from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 import { createLeadSchema } from "@/lib/validation/leads";
 import type { ApiResponse } from "@/types/api";
+import type { AssignableWorkspaceMember } from "@/types/domain";
 
 type LeadResponse = {
+  assigned_member_id: string | null;
   clients: {
     company_name: string | null;
     email: string | null;
@@ -96,7 +107,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("leads")
     .select(
-      "id,client_id,title,source,estimated_value,priority,status,stage_id,next_follow_up_at,created_at,clients(id,name,email,phone,company_name,source)",
+      "id,assigned_member_id,client_id,title,source,estimated_value,priority,status,stage_id,next_follow_up_at,created_at,clients(id,name,email,phone,company_name,source)",
     )
     .eq("workspace_id", activeWorkspace.context.workspace.id)
     .order("created_at", { ascending: false })
@@ -185,8 +196,45 @@ export async function POST(request: Request) {
     const payload = createLeadSchema.parse(await request.json());
     const workspaceId = activeWorkspace.context.workspace.id;
     let stageId: string | null = null;
+    const requestedAssignedMemberId = payload.assigned_member_id ?? null;
+    let assignedMember: AssignableWorkspaceMember | null = null;
 
     let clientId: string | null = null;
+
+    if (requestedAssignedMemberId) {
+      if (!canAssignOperationalRecords(activeWorkspace.context.role)) {
+        return jsonResponse(
+          {
+            error: {
+              code: "LEAD_ASSIGN_FORBIDDEN",
+              message: "Your workspace role cannot assign leads.",
+            },
+            ok: false,
+          },
+          403,
+        );
+      }
+
+      assignedMember = await getAssignableMember({
+        memberId: requestedAssignedMemberId,
+        supabase,
+        workspaceId,
+      });
+
+      if (!assignedMember) {
+        return jsonResponse(
+          {
+            error: {
+              code: "LEAD_ASSIGNEE_INVALID",
+              message:
+                "Choose an active admin, manager, or staff member from this workspace.",
+            },
+            ok: false,
+          },
+          400,
+        );
+      }
+    }
 
     if (payload.stage_id) {
       const { data: stage, error: stageError } = await supabase
@@ -298,6 +346,11 @@ export async function POST(request: Request) {
     const { data: lead, error: leadError } = await supabase
       .from("leads")
       .insert({
+        ...getAssignmentFields({
+          actorUserId: user.id,
+          assignedMember,
+          targetType: "lead",
+        }),
         client_id: clientId,
         created_by: user.id,
         estimated_value: payload.estimated_value,
@@ -312,7 +365,7 @@ export async function POST(request: Request) {
         workspace_id: workspaceId,
       })
       .select(
-        "id,client_id,title,source,estimated_value,priority,status,stage_id,next_follow_up_at,created_at",
+        "id,assigned_member_id,client_id,title,source,estimated_value,priority,status,stage_id,next_follow_up_at,created_at,clients(id,name,email,phone,company_name,source)",
       )
       .single<LeadResponse>();
 
@@ -341,6 +394,24 @@ export async function POST(request: Request) {
       workspace_id: workspaceId,
     });
 
+    const assignmentResult = assignedMember
+      ? {
+          assigned_member: assignedMember,
+          assigned_member_id: assignedMember.id,
+          ok: true,
+          record_id: lead.id,
+          target_type: "lead" as const,
+        }
+      : await autoAssignRecordRoundRobin({
+          recordId: lead.id,
+          targetType: "lead",
+        });
+
+    revalidateLeadPages();
+    if (assignmentResult.auto_created_task_id) {
+      revalidateTaskPages();
+    }
+
     after(() =>
       triggerAutomationForWorkspace({
         automationType: "new_lead_notification",
@@ -358,9 +429,75 @@ export async function POST(request: Request) {
       }),
     );
 
+    if (
+      !assignedMember &&
+      assignmentResult.ok &&
+      assignmentResult.assigned_member_id &&
+      assignmentResult.notify_assignee !== false
+    ) {
+      after(() =>
+        triggerAutomationForWorkspace({
+          automationType: "lead.auto_assigned",
+          payload: {
+            assigned_member_id: assignmentResult.assigned_member_id,
+          },
+          relatedId: lead.id,
+          relatedType: "lead",
+          supabase,
+          workspaceId,
+        }),
+      );
+    }
+
+    if (assignedMember) {
+      after(() =>
+        triggerAutomationForWorkspace({
+          automationType: "lead.assigned",
+          payload: {
+            assigned_member_id: assignedMember.id,
+          },
+          relatedId: lead.id,
+          relatedType: "lead",
+          supabase,
+          workspaceId,
+        }),
+      );
+    }
+
+    if (
+      !assignedMember &&
+      assignmentResult.auto_created_task_id &&
+      assignmentResult.notify_assignee !== false
+    ) {
+      after(() =>
+        triggerAutomationForWorkspace({
+          automationType: "task.auto_created",
+          payload: {
+            assigned_member_id: assignmentResult.assigned_member_id,
+            lead_id: lead.id,
+          },
+          relatedId: assignmentResult.auto_created_task_id,
+          relatedType: "task",
+          supabase,
+          workspaceId,
+        }),
+      );
+    }
+
     return jsonResponse(
       {
-        data: lead,
+        data: {
+          ...lead,
+          assigned_member:
+            assignmentResult.ok ? assignmentResult.assigned_member ?? null : null,
+          assigned_member_id:
+            assignmentResult.ok
+              ? assignmentResult.assigned_member_id ?? null
+              : lead.assigned_member_id,
+          assignment_warning: assignmentResult.ok
+            ? assignmentResult.warning ?? null
+            : assignmentResult.error ?? "Lead was created but auto-assignment failed.",
+        },
         ok: true,
       },
       201,

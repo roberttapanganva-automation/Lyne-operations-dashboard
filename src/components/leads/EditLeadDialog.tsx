@@ -1,23 +1,33 @@
 "use client";
 
 import { PencilSimpleLineIcon, XIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { AssignmentMemberField } from "@/components/assignments/AssignmentMemberField";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { LeadListItem } from "./LeadsList";
 
 type EditLeadDialogProps = {
+  canAssignRecords?: boolean;
   hideTrigger?: boolean;
   lead: LeadListItem;
+  onLeadUpdated?: (lead: LeadListItem) => void;
   onOpenChange?: (open: boolean) => void;
   open?: boolean;
 };
 
 type UpdatedLead = {
+  assigned_member?: LeadListItem["assigned_member"];
+  assigned_member_id: string | null;
+  estimated_value: number | string;
   id: string;
+  next_follow_up_at: string | null;
+  priority: LeadListItem["priority"];
+  source: string | null;
+  status: LeadListItem["status"];
+  title: string;
 };
 
 function splitDateTime(value: string | null) {
@@ -56,12 +66,13 @@ function getErrorMessage(response: ApiResponse<UpdatedLead>) {
 }
 
 export function EditLeadDialog({
+  canAssignRecords = false,
   hideTrigger = false,
   lead,
+  onLeadUpdated,
   onOpenChange,
   open,
 }: EditLeadDialogProps) {
-  const router = useRouter();
   const initialFollowUp = splitDateTime(lead.next_follow_up_at);
   const [internalOpen, setInternalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,6 +116,9 @@ export function EditLeadDialog({
     try {
       const response = await fetch(`/api/leads/${lead.id}`, {
         body: JSON.stringify({
+          assigned_member_id: canAssignRecords
+            ? String(formData.get("assigned_member_id") ?? "") || null
+            : undefined,
           estimated_value: Number(formData.get("estimated_value") ?? 0),
           next_follow_up_at: nextFollowUp,
           priority: String(formData.get("priority") ?? lead.priority),
@@ -127,10 +141,35 @@ export function EditLeadDialog({
         notify.error("Lead could not be updated", errorMessage);
         return;
       }
+      if (!result.ok) {
+        const errorMessage = "We could not update the lead. Please try again.";
+        setError(errorMessage);
+        notify.error("Lead could not be updated", errorMessage);
+        return;
+      }
 
+      onLeadUpdated?.({
+        ...lead,
+        assigned_member:
+          result.data.assigned_member === undefined
+            ? lead.assigned_member
+            : result.data.assigned_member,
+        assigned_member_id:
+          result.data.assigned_member_id === undefined
+            ? lead.assigned_member_id
+            : result.data.assigned_member_id,
+        estimated_value:
+          typeof result.data.estimated_value === "number"
+            ? result.data.estimated_value
+            : Number(result.data.estimated_value),
+        next_follow_up_at: result.data.next_follow_up_at,
+        priority: result.data.priority,
+        source: result.data.source,
+        status: result.data.status,
+        title: result.data.title,
+      });
       setDialogOpen(false);
       notify.success("Lead updated", "The lead details were saved.");
-      router.refresh();
     } catch (caughtError) {
       const errorMessage =
         caughtError instanceof Error
@@ -236,6 +275,13 @@ export function EditLeadDialog({
                     <option value="lost">Lost</option>
                   </select>
                 </div>
+                <AssignmentMemberField
+                  assignedMember={lead.assigned_member}
+                  canAssign={canAssignRecords}
+                  defaultValue={lead.assigned_member_id}
+                  disabled={isSubmitting}
+                  id={`edit-lead-assigned-member-${lead.id}`}
+                />
                 <div>
                   <label
                     className="text-sm font-medium text-[var(--ops-text)]"

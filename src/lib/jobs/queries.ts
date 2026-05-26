@@ -1,8 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
+import { getAssignmentDisplayMapForWorkspace } from "@/lib/assignments/queries";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
+import type { AssignableWorkspaceMember } from "@/types/domain";
 import type { JobListItem } from "@/components/jobs/JobsList";
 
 type JobRow = {
+  assigned_member_id: string | null;
   client_id: string | null;
   clients: {
     email: string | null;
@@ -20,8 +23,22 @@ type JobRow = {
   title: string;
 };
 
-function normalizeJob(row: JobRow): JobListItem {
+function isMissingAssignmentColumnError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("assigned_member_id") &&
+      error.message.includes("does not exist"),
+  );
+}
+
+function normalizeJob(
+  row: JobRow,
+  assignmentsByMemberId: Map<string, AssignableWorkspaceMember>,
+): JobListItem {
   return {
+    assigned_member: row.assigned_member_id
+      ? assignmentsByMemberId.get(row.assigned_member_id) ?? null
+      : null,
+    assigned_member_id: row.assigned_member_id,
     client: row.clients
       ? {
           email: row.clients.email,
@@ -53,18 +70,52 @@ export async function getJobsForActiveWorkspace(): Promise<JobListItem[]> {
   }
 
   const supabase = await createClient();
+  const workspaceId = activeWorkspace.context.workspace.id;
   const { data, error } = await supabase
     .from("jobs")
     .select(
-      "id,client_id,title,service_type,scheduled_start,scheduled_end,location,estimated_value,payment_status,status,created_at,clients(name,email)",
+      "id,assigned_member_id,client_id,title,service_type,scheduled_start,scheduled_end,location,estimated_value,payment_status,status,created_at,clients(name,email)",
     )
-    .eq("workspace_id", activeWorkspace.context.workspace.id)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false })
     .returns<JobRow[]>();
 
   if (error) {
+    if (isMissingAssignmentColumnError(error)) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("jobs")
+        .select(
+          "id,client_id,title,service_type,scheduled_start,scheduled_end,location,estimated_value,payment_status,status,created_at,clients(name,email)",
+        )
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .returns<Omit<JobRow, "assigned_member_id">[]>();
+
+      if (fallbackError) {
+        throw new Error(fallbackError.message);
+      }
+
+      return (fallbackData ?? []).map((job) =>
+        normalizeJob(
+          {
+            ...job,
+            assigned_member_id: null,
+          },
+          new Map(),
+        ),
+      );
+    }
+
     throw new Error(error.message);
   }
 
-  return (data ?? []).map(normalizeJob);
+  const assignmentsByMemberId = await getAssignmentDisplayMapForWorkspace({
+    memberIds: (data ?? [])
+      .map((job) => job.assigned_member_id)
+      .filter((memberId): memberId is string => Boolean(memberId)),
+    supabase,
+    workspaceId,
+  });
+
+  return (data ?? []).map((job) => normalizeJob(job, assignmentsByMemberId));
 }

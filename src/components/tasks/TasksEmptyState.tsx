@@ -1,12 +1,19 @@
 import { CheckSquareIcon, ClockIcon } from "@phosphor-icons/react/ssr";
 import { Card } from "@/components/ui/Card";
 import { AddTaskDialog } from "./AddTaskDialog";
+import type { TaskListItem } from "./TasksList";
 
 type TasksEmptyStateProps = {
+  canAssignRecords: boolean;
   canCreateRecords: boolean;
+  onTaskCreated?: (task: TaskListItem) => void;
 };
 
-export function TasksEmptyState({ canCreateRecords }: TasksEmptyStateProps) {
+export function TasksEmptyState({
+  canAssignRecords,
+  canCreateRecords,
+  onTaskCreated,
+}: TasksEmptyStateProps) {
   return (
     <Card className="overflow-hidden">
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -23,7 +30,12 @@ export function TasksEmptyState({ canCreateRecords }: TasksEmptyStateProps) {
             here.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            {canCreateRecords ? <AddTaskDialog /> : null}
+            {canCreateRecords ? (
+              <AddTaskDialog
+                canAssignRecords={canAssignRecords}
+                onTaskCreated={onTaskCreated}
+              />
+            ) : null}
             <p className="text-sm text-[var(--ops-text-muted)]">
               {canCreateRecords
                 ? "The task will be saved to your active workspace."

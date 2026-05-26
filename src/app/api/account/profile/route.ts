@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateAccountPages } from "@/lib/cache/revalidate-app";
 import { ZodError } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { updateAccountProfileSchema } from "@/lib/validation/profile";
@@ -74,6 +75,8 @@ export async function PATCH(request: Request) {
         500,
       );
     }
+
+    revalidateAccountPages();
 
     return jsonResponse({
       data,

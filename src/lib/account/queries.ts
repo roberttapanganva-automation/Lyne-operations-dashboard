@@ -11,6 +11,7 @@ type ProfileRow = {
 };
 
 type WorkspaceMembershipRow = {
+  id: string;
   role: WorkspaceRole;
   status: "active" | "invited" | "disabled";
   workspace_id: string;
@@ -93,15 +94,7 @@ export async function getCurrentAccountSummary(): Promise<CurrentAccountSummary 
   const activeWorkspaceId =
     activeWorkspace.status === "ready" ? activeWorkspace.context.workspace.id : null;
 
-  const [
-    profileResult,
-    membershipResult,
-    leadCountResult,
-    jobCountResult,
-    taskCountResult,
-    recentTasksResult,
-    recentLeadsResult,
-  ] = await Promise.all([
+  const [profileResult, membershipResult] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name,avatar_url,timezone,theme_mode")
@@ -110,55 +103,66 @@ export async function getCurrentAccountSummary(): Promise<CurrentAccountSummary 
     activeWorkspaceId
       ? supabase
           .from("workspace_members")
-          .select("workspace_id,role,status")
+          .select("id,workspace_id,role,status")
           .eq("workspace_id", activeWorkspaceId)
           .eq("user_id", user.id)
           .maybeSingle<WorkspaceMembershipRow>()
       : Promise.resolve({ data: null, error: null }),
-    activeWorkspaceId
+  ]);
+
+  const workspaceMemberId = membershipResult.data?.id ?? null;
+
+  const [
+    leadCountResult,
+    jobCountResult,
+    taskCountResult,
+    recentTasksResult,
+    recentLeadsResult,
+  ] = await Promise.all([
+    activeWorkspaceId && workspaceMemberId
       ? supabase
           .from("leads")
           .select("id", { count: "exact", head: true })
           .eq("workspace_id", activeWorkspaceId)
-          .eq("assigned_to", user.id)
+          .eq("assigned_member_id", workspaceMemberId)
           .eq("status", "open")
           .returns<ActivityCountResult[]>()
       : Promise.resolve({ count: null, data: null, error: null }),
-    activeWorkspaceId
+    activeWorkspaceId && workspaceMemberId
       ? supabase
           .from("jobs")
           .select("id", { count: "exact", head: true })
           .eq("workspace_id", activeWorkspaceId)
-          .eq("assigned_to", user.id)
+          .eq("assigned_member_id", workspaceMemberId)
           .in("status", ["scheduled", "in_progress"])
           .returns<ActivityCountResult[]>()
       : Promise.resolve({ count: null, data: null, error: null }),
-    activeWorkspaceId
+    activeWorkspaceId && workspaceMemberId
       ? supabase
           .from("tasks")
           .select("id", { count: "exact", head: true })
           .eq("workspace_id", activeWorkspaceId)
-          .eq("assigned_to", user.id)
+          .eq("assigned_member_id", workspaceMemberId)
           .in("status", ["todo", "in_progress"])
           .returns<ActivityCountResult[]>()
       : Promise.resolve({ count: null, data: null, error: null }),
-    activeWorkspaceId
+    activeWorkspaceId && workspaceMemberId
       ? supabase
           .from("tasks")
           .select("id,title,status,due_at,created_at")
           .eq("workspace_id", activeWorkspaceId)
-          .eq("assigned_to", user.id)
+          .eq("assigned_member_id", workspaceMemberId)
           .in("status", ["todo", "in_progress"])
           .order("created_at", { ascending: false })
           .limit(3)
           .returns<RecentAssignedTaskRow[]>()
       : Promise.resolve({ data: null, error: null }),
-    activeWorkspaceId
+    activeWorkspaceId && workspaceMemberId
       ? supabase
           .from("leads")
           .select("id,title,status,next_follow_up_at,created_at")
           .eq("workspace_id", activeWorkspaceId)
-          .eq("assigned_to", user.id)
+          .eq("assigned_member_id", workspaceMemberId)
           .eq("status", "open")
           .order("created_at", { ascending: false })
           .limit(3)

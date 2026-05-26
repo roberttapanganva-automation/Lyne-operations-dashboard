@@ -1,11 +1,7 @@
 "use client";
 
-import { BriefcaseIcon } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
-import {
-  getTopbarRouteMatch,
-  TopbarHeading,
-} from "@/components/app-shell/TopbarHeading";
+import { TopbarHeading } from "@/components/app-shell/TopbarHeading";
 
 type TopbarTitleBlockProps = {
   appName: string;
@@ -19,38 +15,15 @@ export function TopbarTitleBlock({
   greeting,
 }: TopbarTitleBlockProps) {
   const pathname = usePathname();
-
-  if (pathname === "/dashboard") {
-    return (
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
-          {appName}
-        </p>
-        <TopbarHeading displayName={displayName} greeting={greeting} />
-      </div>
-    );
-  }
-
-  const routeMatch = getTopbarRouteMatch(pathname);
-  const RouteIcon = routeMatch?.Icon ?? BriefcaseIcon;
-  const routeTitle = routeMatch?.title ?? "Workspace";
-  const hasStrongTitleTreatment = Boolean(routeMatch?.subtitle);
-
-  if (hasStrongTitleTreatment) {
-    return <TopbarHeading displayName={displayName} greeting={greeting} />;
-  }
+  const showAppName = pathname === "/dashboard";
 
   return (
     <div>
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
-        <RouteIcon
-          aria-hidden="true"
-          className="text-[var(--ops-primary-dark)]"
-          size={14}
-          weight="duotone"
-        />
-        <span>{routeTitle}</span>
-      </div>
+      {showAppName ? (
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)] drop-shadow-[0_1px_1px_rgba(148,163,184,0.28)]">
+          {appName}
+        </p>
+      ) : null}
       <TopbarHeading displayName={displayName} greeting={greeting} />
     </div>
   );

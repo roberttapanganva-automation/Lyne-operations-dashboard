@@ -1,6 +1,13 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { revalidateJobPages } from "@/lib/cache/revalidate-app";
 import { z, ZodError } from "zod";
 import {
+  getAssignableMember,
+  getAssignmentFields,
+} from "@/lib/assignments/engine";
+import { triggerAutomationForWorkspace } from "@/lib/n8n/client";
+import {
+  canAssignOperationalRecords,
   canDeleteOperationalRecords,
   canEditOperationalRecords,
 } from "@/lib/permissions/workspace";
@@ -8,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 import { updateJobSchema } from "@/lib/validation/jobs";
 import type { ApiResponse } from "@/types/api";
+import type { AssignableWorkspaceMember } from "@/types/domain";
 
 type DeletedJob = {
   id: string;
@@ -15,6 +23,8 @@ type DeletedJob = {
 };
 
 type UpdatedJob = DeletedJob & {
+  assigned_member?: AssignableWorkspaceMember | null;
+  assigned_member_id: string | null;
   estimated_value: number | string;
   location: string | null;
   payment_status: "unpaid" | "partial" | "paid" | "refunded" | "not_applicable";
@@ -113,10 +123,105 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const payload = updateJobSchema.parse(await request.json());
+    const rawPayload = (await request.json()) as Record<string, unknown>;
+    const payload = updateJobSchema.parse(rawPayload);
+    const workspaceId = activeWorkspace.context.workspace.id;
+    const assignmentIncluded = Object.prototype.hasOwnProperty.call(
+      rawPayload,
+      "assigned_member_id",
+    );
+    let assignedMember: AssignableWorkspaceMember | null = null;
+    let assignmentChanged = false;
+    let assignmentFields: Record<string, unknown> = {};
+
+    if (assignmentIncluded) {
+      if (!canAssignOperationalRecords(activeWorkspace.context.role)) {
+        return jsonResponse(
+          {
+            error: {
+              code: "JOB_ASSIGN_FORBIDDEN",
+              message: "Your workspace role cannot assign jobs.",
+            },
+            ok: false,
+          },
+          403,
+        );
+      }
+
+      const nextAssignedMemberId = payload.assigned_member_id ?? null;
+
+      if (nextAssignedMemberId) {
+        assignedMember = await getAssignableMember({
+          memberId: nextAssignedMemberId,
+          supabase,
+          workspaceId,
+        });
+
+        if (!assignedMember) {
+          return jsonResponse(
+            {
+              error: {
+                code: "JOB_ASSIGNEE_INVALID",
+                message:
+                  "Choose an active admin, manager, or staff member from this workspace.",
+              },
+              ok: false,
+            },
+            400,
+          );
+        }
+      }
+
+      const { data: currentJob, error: currentJobError } = await supabase
+        .from("jobs")
+        .select("id,assigned_member_id")
+        .eq("id", jobIdResult.data)
+        .eq("workspace_id", workspaceId)
+        .maybeSingle<{ assigned_member_id: string | null; id: string }>();
+
+      if (currentJobError) {
+        return jsonResponse(
+          {
+            error: {
+              code: "JOB_LOOKUP_FAILED",
+              message: "We could not verify the selected job.",
+              details: currentJobError.message,
+            },
+            ok: false,
+          },
+          500,
+        );
+      }
+
+      if (!currentJob) {
+        return jsonResponse(
+          {
+            error: {
+              code: "JOB_NOT_FOUND",
+              message: "The selected job is not available in this workspace.",
+            },
+            ok: false,
+          },
+          404,
+        );
+      }
+
+      assignmentChanged = currentJob.assigned_member_id !== nextAssignedMemberId;
+
+      if (assignmentChanged) {
+        assignmentFields = getAssignmentFields({
+          actorUserId: user.id,
+          assignedMember,
+          includeNulls: true,
+          targetType: "job",
+        });
+      }
+    }
+
     const { data: job, error: jobError } = await supabase
       .from("jobs")
       .update({
+        ...assignmentFields,
         estimated_value: payload.estimated_value,
         location: payload.location ?? null,
         payment_status: payload.payment_status,
@@ -126,8 +231,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         updated_by: user.id,
       })
       .eq("id", jobIdResult.data)
-      .eq("workspace_id", activeWorkspace.context.workspace.id)
-      .select("id,title,service_type,location,estimated_value,payment_status,status")
+      .eq("workspace_id", workspaceId)
+      .select("id,assigned_member_id,title,service_type,location,estimated_value,payment_status,status")
       .single<UpdatedJob>();
 
     if (jobError) {
@@ -150,14 +255,35 @@ export async function PATCH(request: Request, context: RouteContext) {
       entity_id: job.id,
       entity_type: "job",
       metadata: {
+        assigned_member_id: assignmentIncluded ? job.assigned_member_id : undefined,
         status: job.status,
         title: job.title,
       },
-      workspace_id: activeWorkspace.context.workspace.id,
+      workspace_id: workspaceId,
     });
 
+    revalidateJobPages();
+
+    if (assignmentChanged) {
+      after(() =>
+        triggerAutomationForWorkspace({
+          automationType: "job.assigned",
+          payload: {
+            assigned_member_id: job.assigned_member_id,
+          },
+          relatedId: job.id,
+          relatedType: "job",
+          supabase,
+          workspaceId,
+        }),
+      );
+    }
+
     return jsonResponse({
-      data: job,
+      data: {
+        ...job,
+        assigned_member: assignmentIncluded ? assignedMember : undefined,
+      },
       ok: true,
     });
   } catch (error) {
@@ -286,6 +412,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
     },
     workspace_id: activeWorkspace.context.workspace.id,
   });
+
+  revalidateJobPages();
 
   return jsonResponse({
     data: job,

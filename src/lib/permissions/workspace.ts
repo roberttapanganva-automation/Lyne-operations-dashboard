@@ -27,6 +27,10 @@ export function canViewWorkspace(role: WorkspaceRole | null) {
   );
 }
 
+export function canViewReports(role: WorkspaceRole | null) {
+  return role === "owner" || role === "admin" || role === "manager";
+}
+
 export function canCreateOperationalRecords(role: WorkspaceRole | null) {
   return canManageOperations(role);
 }
@@ -36,6 +40,10 @@ export function canEditOperationalRecords(role: WorkspaceRole | null) {
 }
 
 export function canDeleteOperationalRecords(role: WorkspaceRole | null) {
+  return role === "owner" || role === "admin" || role === "manager";
+}
+
+export function canAssignOperationalRecords(role: WorkspaceRole | null) {
   return role === "owner" || role === "admin" || role === "manager";
 }
 

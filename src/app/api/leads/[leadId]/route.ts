@@ -1,6 +1,13 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { revalidateLeadPages } from "@/lib/cache/revalidate-app";
 import { z, ZodError } from "zod";
 import {
+  getAssignableMember,
+  getAssignmentFields,
+} from "@/lib/assignments/engine";
+import { triggerAutomationForWorkspace } from "@/lib/n8n/client";
+import {
+  canAssignOperationalRecords,
   canDeleteOperationalRecords,
   canEditOperationalRecords,
 } from "@/lib/permissions/workspace";
@@ -8,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 import { updateLeadSchema } from "@/lib/validation/leads";
 import type { ApiResponse } from "@/types/api";
+import type { AssignableWorkspaceMember } from "@/types/domain";
 
 type DeletedLead = {
   id: string;
@@ -15,6 +23,8 @@ type DeletedLead = {
 };
 
 type UpdatedLead = DeletedLead & {
+  assigned_member?: AssignableWorkspaceMember | null;
+  assigned_member_id: string | null;
   estimated_value: number | string;
   next_follow_up_at: string | null;
   priority: "low" | "normal" | "high" | "urgent";
@@ -113,10 +123,105 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const payload = updateLeadSchema.parse(await request.json());
+    const rawPayload = (await request.json()) as Record<string, unknown>;
+    const payload = updateLeadSchema.parse(rawPayload);
+    const workspaceId = activeWorkspace.context.workspace.id;
+    const assignmentIncluded = Object.prototype.hasOwnProperty.call(
+      rawPayload,
+      "assigned_member_id",
+    );
+    let assignedMember: AssignableWorkspaceMember | null = null;
+    let assignmentChanged = false;
+    let assignmentFields: Record<string, unknown> = {};
+
+    if (assignmentIncluded) {
+      if (!canAssignOperationalRecords(activeWorkspace.context.role)) {
+        return jsonResponse(
+          {
+            error: {
+              code: "LEAD_ASSIGN_FORBIDDEN",
+              message: "Your workspace role cannot assign leads.",
+            },
+            ok: false,
+          },
+          403,
+        );
+      }
+
+      const nextAssignedMemberId = payload.assigned_member_id ?? null;
+
+      if (nextAssignedMemberId) {
+        assignedMember = await getAssignableMember({
+          memberId: nextAssignedMemberId,
+          supabase,
+          workspaceId,
+        });
+
+        if (!assignedMember) {
+          return jsonResponse(
+            {
+              error: {
+                code: "LEAD_ASSIGNEE_INVALID",
+                message:
+                  "Choose an active admin, manager, or staff member from this workspace.",
+              },
+              ok: false,
+            },
+            400,
+          );
+        }
+      }
+
+      const { data: currentLead, error: currentLeadError } = await supabase
+        .from("leads")
+        .select("id,assigned_member_id")
+        .eq("id", leadIdResult.data)
+        .eq("workspace_id", workspaceId)
+        .maybeSingle<{ assigned_member_id: string | null; id: string }>();
+
+      if (currentLeadError) {
+        return jsonResponse(
+          {
+            error: {
+              code: "LEAD_LOOKUP_FAILED",
+              message: "We could not verify the selected lead.",
+              details: currentLeadError.message,
+            },
+            ok: false,
+          },
+          500,
+        );
+      }
+
+      if (!currentLead) {
+        return jsonResponse(
+          {
+            error: {
+              code: "LEAD_NOT_FOUND",
+              message: "The selected lead is not available in this workspace.",
+            },
+            ok: false,
+          },
+          404,
+        );
+      }
+
+      assignmentChanged = currentLead.assigned_member_id !== nextAssignedMemberId;
+
+      if (assignmentChanged) {
+        assignmentFields = getAssignmentFields({
+          actorUserId: user.id,
+          assignedMember,
+          includeNulls: true,
+          targetType: "lead",
+        });
+      }
+    }
+
     const { data: lead, error: leadError } = await supabase
       .from("leads")
       .update({
+        ...assignmentFields,
         estimated_value: payload.estimated_value,
         next_follow_up_at: payload.next_follow_up_at ?? null,
         priority: payload.priority,
@@ -126,8 +231,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         updated_by: user.id,
       })
       .eq("id", leadIdResult.data)
-      .eq("workspace_id", activeWorkspace.context.workspace.id)
-      .select("id,title,source,estimated_value,priority,status,next_follow_up_at")
+      .eq("workspace_id", workspaceId)
+      .select("id,assigned_member_id,title,source,estimated_value,priority,status,next_follow_up_at")
       .single<UpdatedLead>();
 
     if (leadError) {
@@ -150,14 +255,37 @@ export async function PATCH(request: Request, context: RouteContext) {
       entity_id: lead.id,
       entity_type: "lead",
       metadata: {
+        assigned_member_id: assignmentIncluded
+          ? lead.assigned_member_id
+          : undefined,
         status: lead.status,
         title: lead.title,
       },
-      workspace_id: activeWorkspace.context.workspace.id,
+      workspace_id: workspaceId,
     });
 
+    revalidateLeadPages();
+
+    if (assignmentChanged) {
+      after(() =>
+        triggerAutomationForWorkspace({
+          automationType: "lead.assigned",
+          payload: {
+            assigned_member_id: lead.assigned_member_id,
+          },
+          relatedId: lead.id,
+          relatedType: "lead",
+          supabase,
+          workspaceId,
+        }),
+      );
+    }
+
     return jsonResponse({
-      data: lead,
+      data: {
+        ...lead,
+        assigned_member: assignmentIncluded ? assignedMember : undefined,
+      },
       ok: true,
     });
   } catch (error) {
@@ -286,6 +414,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
     },
     workspace_id: activeWorkspace.context.workspace.id,
   });
+
+  revalidateLeadPages();
 
   return jsonResponse({
     data: lead,

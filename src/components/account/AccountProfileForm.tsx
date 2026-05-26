@@ -1,10 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import { CaretDownIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { dispatchAccountUpdated } from "@/lib/account/accountEvents";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 
@@ -34,17 +34,18 @@ type ProfileResponse = {
 };
 
 type AccountProfileFormProps = {
+  embedded?: boolean;
   email: string | null;
   fullName: string | null;
   timezone: string;
 };
 
 export function AccountProfileForm({
+  embedded = false,
   email,
   fullName,
   timezone,
 }: AccountProfileFormProps) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
@@ -80,8 +81,10 @@ export function AccountProfileForm({
       }
 
       setSuccess("Profile updated.");
+      dispatchAccountUpdated({
+        fullName: result.data.full_name,
+      });
       notify.success("Changes saved", "Your account details were updated.");
-      router.refresh();
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
@@ -94,11 +97,11 @@ export function AccountProfileForm({
     }
   }
 
-  return (
-    <Card className="p-5 sm:p-6">
+  const content = (
+    <>
       <div>
         <h2 className="text-base font-semibold text-[var(--ops-text)]">
-          Personal details
+          Personal Details
         </h2>
         <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
           Update the name and timezone your teammates see across the workspace.
@@ -196,6 +199,12 @@ export function AccountProfileForm({
           </Button>
         </div>
       </form>
-    </Card>
+    </>
   );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <Card className="p-5 sm:p-6">{content}</Card>;
 }

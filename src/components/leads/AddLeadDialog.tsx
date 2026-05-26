@@ -1,25 +1,34 @@
 "use client";
 
 import { XIcon, PlusIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { AssignmentMemberField } from "@/components/assignments/AssignmentMemberField";
 import { notify } from "@/lib/ui/toast";
 import type { LeadPipelineStageOption } from "@/lib/pipelines/queries";
 import type { ApiResponse } from "@/types/api";
 import type { Client } from "@/types/domain";
 import { ContactSelect } from "./ContactSelect";
+import type { LeadListItem } from "./LeadsList";
 
 type AddLeadDialogProps = {
+  canAssignRecords?: boolean;
   className?: string;
   clients?: Client[];
+  onLeadCreated?: (lead: LeadListItem) => void;
   stageOptions?: LeadPipelineStageOption[];
   variant?: "primary" | "secondary" | "ghost";
 };
 
-type CreatedLead = {
-  id: string;
+type CreatedLead = Omit<
+  LeadListItem,
+  "assigned_member" | "assigned_member_id" | "client" | "estimated_value"
+> & {
+  assigned_member?: LeadListItem["assigned_member"];
+  assigned_member_id?: string | null;
+  clients: LeadListItem["client"];
+  estimated_value: number | string;
 };
 
 function getErrorMessage(response: ApiResponse<CreatedLead>) {
@@ -30,13 +39,35 @@ function getErrorMessage(response: ApiResponse<CreatedLead>) {
   return response.error.message;
 }
 
+function normalizeLead(lead: CreatedLead): LeadListItem {
+  return {
+    assigned_member: lead.assigned_member ?? null,
+    assigned_member_id: lead.assigned_member_id ?? null,
+    client: lead.clients,
+    client_id: lead.client_id,
+    created_at: lead.created_at,
+    estimated_value:
+      typeof lead.estimated_value === "number"
+        ? lead.estimated_value
+        : Number(lead.estimated_value),
+    id: lead.id,
+    next_follow_up_at: lead.next_follow_up_at,
+    priority: lead.priority,
+    source: lead.source,
+    stage_id: lead.stage_id,
+    status: lead.status,
+    title: lead.title,
+  };
+}
+
 export function AddLeadDialog({
+  canAssignRecords = false,
   className = "",
   clients = [],
+  onLeadCreated,
   stageOptions = [],
   variant = "primary",
 }: AddLeadDialogProps) {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,6 +110,9 @@ export function AddLeadDialog({
         : "";
 
     const payload = {
+      assigned_member_id: canAssignRecords
+        ? String(formData.get("assigned_member_id") ?? "") || null
+        : undefined,
       client_id: selectedClientId || undefined,
       client_email: String(formData.get("client_email") ?? ""),
       client_name: String(formData.get("client_name") ?? ""),
@@ -113,13 +147,19 @@ export function AddLeadDialog({
         notify.error("Lead could not be added", errorMessage);
         return;
       }
+      if (!result.ok) {
+        const errorMessage = "We could not create the lead. Please try again.";
+        setError(errorMessage);
+        notify.error("Lead could not be added", errorMessage);
+        return;
+      }
 
       formRef.current?.reset();
       setNextFollowUpDate(undefined);
       setSelectedClientId("");
       setIsOpen(false);
+      onLeadCreated?.(normalizeLead(result.data));
       notify.success("Lead added", "The lead was added to your CRM.");
-      router.refresh();
     } catch (caughtError) {
       const errorMessage =
         caughtError instanceof Error
@@ -226,6 +266,14 @@ export function AddLeadDialog({
                     ))}
                   </select>
                 </div>
+              ) : null}
+
+              {canAssignRecords ? (
+                <AssignmentMemberField
+                  canAssign={canAssignRecords}
+                  disabled={isSubmitting}
+                  id="lead-assigned-member"
+                />
               ) : null}
 
               <div className="space-y-5 rounded-xl border border-[var(--ops-border)] bg-[var(--ops-card-soft)] p-4">
@@ -454,7 +502,7 @@ export function AddLeadDialog({
                   Cancel
                 </Button>
                 <Button disabled={isSubmitting} type="submit">
-                  {isSubmitting ? "Creating..." : "Create lead"}
+                  {isSubmitting ? "Adding..." : "Add lead"}
                 </Button>
               </div>
             </form>

@@ -1,12 +1,19 @@
 import { BriefcaseIcon, CalendarBlankIcon } from "@phosphor-icons/react/ssr";
 import { Card } from "@/components/ui/Card";
 import { AddJobDialog } from "./AddJobDialog";
+import type { JobListItem } from "./JobsList";
 
 type JobsEmptyStateProps = {
+  canAssignRecords: boolean;
   canCreateRecords: boolean;
+  onJobCreated?: (job: JobListItem) => void;
 };
 
-export function JobsEmptyState({ canCreateRecords }: JobsEmptyStateProps) {
+export function JobsEmptyState({
+  canAssignRecords,
+  canCreateRecords,
+  onJobCreated,
+}: JobsEmptyStateProps) {
   return (
     <Card className="overflow-hidden">
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -22,7 +29,12 @@ export function JobsEmptyState({ canCreateRecords }: JobsEmptyStateProps) {
             appear here.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            {canCreateRecords ? <AddJobDialog /> : null}
+            {canCreateRecords ? (
+              <AddJobDialog
+                canAssignRecords={canAssignRecords}
+                onJobCreated={onJobCreated}
+              />
+            ) : null}
             <p className="text-sm text-[var(--ops-text-muted)]">
               {canCreateRecords
                 ? "The job will be saved to your active workspace."

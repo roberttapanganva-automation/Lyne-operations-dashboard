@@ -5,13 +5,14 @@ type AccountAvatarProps = {
   className?: string;
   email?: string | null;
   fullName?: string | null;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
 };
 
 const sizeClasses = {
   lg: "h-16 w-16 text-lg",
   md: "h-10 w-10 text-sm",
   sm: "h-9 w-9 text-sm",
+  xs: "h-8 w-8 text-xs",
   xl: "h-24 w-24 text-2xl",
 } as const;
 

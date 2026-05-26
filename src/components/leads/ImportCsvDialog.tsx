@@ -109,24 +109,30 @@ export function ImportCsvDialog({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(endpoint, {
+      const importPromise = fetch(endpoint, {
         body: JSON.stringify({ rows: validRows }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
-      });
-      const result = (await response.json()) as ApiResponse<ImportResponse>;
-      const message = getErrorMessage(result);
+      }).then(async (response) => {
+        const result = (await response.json()) as ApiResponse<ImportResponse>;
+        const message = getErrorMessage(result);
 
-      if (!response.ok || message || !result.ok) {
-        const errorMessage =
-          message ?? `We could not import ${label.toLowerCase()}.`;
-        setError(errorMessage);
-        notify.error("Import failed", "Check the file format and try again.");
-        return;
-      }
+        if (!response.ok || message || !result.ok) {
+          throw new Error(message ?? `We could not import ${label.toLowerCase()}.`);
+        }
+
+        return result;
+      });
+      notify.promise(importPromise, {
+        error: "Import failed",
+        loading: `Importing ${label.toLowerCase()}...`,
+        success: "Import complete",
+      });
+      const result = await importPromise;
 
       const errorCount = result.data.results.filter(
-        (rowResult) => rowResult.status === "error",
+        (rowResult: ImportResponse["results"][number]) =>
+          rowResult.status === "error",
       ).length;
 
       setResultSummary(
@@ -134,18 +140,18 @@ export function ImportCsvDialog({
           result.data.reused ? `, ${result.data.reused} reused` : ""
         }${errorCount ? `, ${errorCount} skipped` : ""}.`,
       );
-      notify.success(
-        "Import complete",
-        label.toLowerCase().includes("lead")
-          ? "Your leads were imported successfully."
-          : "Your contacts were imported successfully.",
-      );
       if (errorCount > 0) {
         const errorMessage =
           result.data.results
-            .filter((rowResult) => rowResult.status === "error")
+            .filter(
+              (rowResult: ImportResponse["results"][number]) =>
+                rowResult.status === "error",
+            )
             .slice(0, 3)
-            .map((rowResult) => `Row ${rowResult.row}: ${rowResult.message}`)
+            .map(
+              (rowResult: ImportResponse["results"][number]) =>
+                `Row ${rowResult.row}: ${rowResult.message}`,
+            )
             .join(" ");
         setError(errorMessage);
         notify.warning("Some rows were skipped", errorMessage);
@@ -157,7 +163,6 @@ export function ImportCsvDialog({
           ? caughtError.message
           : `We could not import ${label.toLowerCase()}.`;
       setError(errorMessage);
-      notify.error("Import failed", "Check the file format and try again.");
     } finally {
       setIsSubmitting(false);
     }

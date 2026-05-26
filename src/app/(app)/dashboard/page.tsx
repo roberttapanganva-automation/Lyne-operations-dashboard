@@ -60,8 +60,7 @@ export default async function DashboardPage() {
           Your operations command center is live.
         </h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--ops-text-soft)]">
-          Start the day with a clear read on pipeline movement, scheduled work,
-          overdue follow-ups, and the activity shaping this workspace.
+          Track today’s priorities, open work, pipeline activity, and key business updates in one place.
         </p>
       </section>
 

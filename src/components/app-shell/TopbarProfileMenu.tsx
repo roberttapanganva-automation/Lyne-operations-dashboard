@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CaretDownIcon,
   DesktopIcon,
@@ -13,11 +12,16 @@ import {
   UserCircleIcon,
 } from "@phosphor-icons/react";
 import { AccountAvatar } from "@/components/account/AccountAvatar";
+import {
+  ACCOUNT_UPDATED_EVENT,
+  type AccountUpdatedDetail,
+} from "@/lib/account/accountEvents";
 import { useThemePreference } from "@/components/theme/ThemeProvider";
 import { createClient } from "@/lib/supabase/client";
 import type { CurrentAccountSummary } from "@/lib/account/queries";
 import type { ApiResponse } from "@/types/api";
 import type { ThemeMode, UserThemePreference, WorkspaceRole } from "@/types/domain";
+import { SmartNavLink } from "./SmartNavLink";
 
 type ThemePreferenceUpdateResponse = UserThemePreference & {
   theme_mode: ThemeMode;
@@ -57,14 +61,40 @@ export function TopbarProfileMenu({ account, role }: TopbarProfileMenuProps) {
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
   const { setUserThemeMode, userThemeMode } = useThemePreference();
+  const [accountOverride, setAccountOverride] = useState<{
+    avatarUrl?: string | null;
+    fullName?: string | null;
+  } | null>(null);
   const [confirmSignOutOpen, setConfirmSignOutOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSavingTheme, setIsSavingTheme] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const liveAccount = useMemo(() => {
+    if (!account) {
+      return null;
+    }
 
-  const displayName = account?.displayName ?? account?.email ?? "Account";
-  const email = account?.email ?? "No email available";
+    const fullName =
+      accountOverride?.fullName !== undefined
+        ? accountOverride.fullName
+        : account.fullName;
+    const displayName =
+      fullName?.trim() || account.email || account.displayName;
+
+    return {
+      ...account,
+      avatarUrl:
+        accountOverride?.avatarUrl !== undefined
+          ? accountOverride.avatarUrl
+          : account.avatarUrl,
+      displayName,
+      fullName,
+    };
+  }, [account, accountOverride]);
+
+  const displayName = liveAccount?.displayName ?? liveAccount?.email ?? "Account";
+  const email = liveAccount?.email ?? "No email available";
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -78,6 +108,18 @@ export function TopbarProfileMenu({ account, role }: TopbarProfileMenuProps) {
       }
     }
 
+    function handleAccountUpdated(event: Event) {
+      const detail = (event as CustomEvent<AccountUpdatedDetail>).detail;
+      setAccountOverride((current) => ({
+        avatarUrl:
+          detail.avatarUrl !== undefined
+            ? detail.avatarUrl
+            : current?.avatarUrl,
+        fullName:
+          detail.fullName !== undefined ? detail.fullName : current?.fullName,
+      }));
+    }
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsOpen(false);
@@ -87,10 +129,15 @@ export function TopbarProfileMenu({ account, role }: TopbarProfileMenuProps) {
 
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener(ACCOUNT_UPDATED_EVENT, handleAccountUpdated as EventListener);
 
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener(
+        ACCOUNT_UPDATED_EVENT,
+        handleAccountUpdated as EventListener,
+      );
     };
   }, []);
 
@@ -116,7 +163,6 @@ export function TopbarProfileMenu({ account, role }: TopbarProfileMenuProps) {
       }
 
       setUserThemeMode(result.data.theme_mode);
-      router.refresh();
     } catch (caughtError) {
       setUserThemeMode(previousMode);
       setError(
@@ -135,7 +181,6 @@ export function TopbarProfileMenu({ account, role }: TopbarProfileMenuProps) {
       await supabase.auth.signOut();
     } finally {
       router.replace("/login");
-      router.refresh();
     }
   }
 
@@ -156,9 +201,9 @@ export function TopbarProfileMenu({ account, role }: TopbarProfileMenuProps) {
         {account ? (
           <span className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center">
             <AccountAvatar
-              avatarUrl={account.avatarUrl}
-              email={account.email}
-              fullName={account.fullName}
+              avatarUrl={liveAccount?.avatarUrl ?? null}
+              email={liveAccount?.email ?? null}
+              fullName={liveAccount?.fullName ?? null}
               size="sm"
             />
             <span
@@ -188,27 +233,29 @@ export function TopbarProfileMenu({ account, role }: TopbarProfileMenuProps) {
           <div className="border-b border-[var(--ops-border)] bg-[var(--ops-card-soft)]/70 p-3.5">
             <div className="flex items-start gap-3">
               <AccountAvatar
-                avatarUrl={account?.avatarUrl}
-                email={account?.email}
-                fullName={account?.fullName}
+                avatarUrl={liveAccount?.avatarUrl ?? null}
+                email={liveAccount?.email ?? null}
+                fullName={liveAccount?.fullName ?? null}
                 size="md"
               />
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                  {displayName}
-                </p>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                    {displayName}
+                  </p>
+                  <span className="inline-flex shrink-0 rounded-full border border-[var(--workspace-primary,var(--ops-primary))]/15 bg-[var(--ops-primary-soft)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--workspace-primary,var(--ops-primary-dark))]">
+                    {formatRole(role)}
+                  </span>
+                </div>
                 <p className="mt-0.5 truncate text-xs text-[var(--ops-text-soft)]">
                   {email}
                 </p>
-                <span className="mt-2 inline-flex rounded-full border border-[var(--workspace-primary,var(--ops-primary))]/15 bg-[var(--ops-primary-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--workspace-primary,var(--ops-primary-dark))]">
-                  {formatRole(role)}
-                </span>
               </div>
             </div>
           </div>
 
           <div className="p-1.5">
-            <Link
+            <SmartNavLink
               className="block rounded-lg px-3 py-2.5 transition hover:bg-[var(--ops-card-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
               href="/account"
               onClick={() => setIsOpen(false)}
@@ -220,7 +267,7 @@ export function TopbarProfileMenu({ account, role }: TopbarProfileMenuProps) {
               <span className="mt-0.5 block text-xs text-[var(--ops-text-soft)]">
                 Edit profile & avatar
               </span>
-            </Link>
+            </SmartNavLink>
           </div>
 
           <div className="border-t border-[var(--ops-border)] px-3 py-3">

@@ -3,6 +3,7 @@
 import {
   BriefcaseIcon,
   CalendarBlankIcon,
+  ChartBarIcon,
   CheckSquareIcon,
   CrownIcon,
   GearSixIcon,
@@ -23,52 +24,125 @@ export const routeTitles: Array<{
   subtitle?: string;
   title: string;
 }> = [
-  { Icon: CrownIcon, match: /^\/owner\/branding/, title: "Branding" },
-  { Icon: CrownIcon, match: /^\/owner\/modules/, title: "Modules" },
-  { Icon: CrownIcon, match: /^\/owner\/pipeline/, title: "Pipeline" },
-  { Icon: CrownIcon, match: /^\/owner\/access-rules/, title: "Access Rules" },
-  { Icon: CrownIcon, match: /^\/owner\/audit-logs/, title: "Audit Logs" },
-  { Icon: CrownIcon, match: /^\/owner\/invitations/, title: "Invitations" },
-  { Icon: CrownIcon, match: /^\/owner\/team/, title: "Team" },
-  { Icon: CrownIcon, match: /^\/owner/, title: "Owner Console" },
+  {
+    Icon: CrownIcon,
+    match: /^\/owner\/branding/,
+    subtitle:
+      "Control workspace branding, roles, permissions, modules, and business-level configuration.",
+    title: "Branding",
+  },
+  {
+    Icon: CrownIcon,
+    match: /^\/owner\/modules/,
+    subtitle:
+      "Control workspace branding, roles, permissions, modules, and business-level configuration.",
+    title: "Modules",
+  },
+  {
+    Icon: CrownIcon,
+    match: /^\/owner\/pipeline/,
+    subtitle:
+      "Customize lead and job stages to match how your business tracks work from start to finish.",
+    title: "Pipeline",
+  },
+  {
+    Icon: CrownIcon,
+    match: /^\/owner\/access-rules/,
+    subtitle:
+      "Control workspace branding, roles, permissions, modules, and business-level configuration.",
+    title: "Access Rules",
+  },
+  {
+    Icon: CrownIcon,
+    match: /^\/owner\/audit-logs/,
+    subtitle:
+      "Control workspace branding, roles, permissions, modules, and business-level configuration.",
+    title: "Audit Logs",
+  },
+  {
+    Icon: CrownIcon,
+    match: /^\/owner\/invitations/,
+    subtitle:
+      "Control workspace branding, roles, permissions, modules, and business-level configuration.",
+    title: "Invitations",
+  },
+  {
+    Icon: CrownIcon,
+    match: /^\/owner\/team/,
+    subtitle:
+      "Control workspace branding, roles, permissions, modules, and business-level configuration.",
+    title: "Team",
+  },
+  {
+    Icon: CrownIcon,
+    match: /^\/owner/,
+    subtitle:
+      "Control workspace branding, roles, permissions, modules, and business-level configuration.",
+    title: "Owner Console",
+  },
   {
     Icon: UsersThreeIcon,
     match: /^\/leads/,
     subtitle:
-      "Keep the team focused on live opportunities, response timing, and the next best follow-up across the active workspace.",
+      "Manage contacts, leads, follow-ups, and pipeline activity across your workspace.",
     title: "CRM",
   },
   {
     Icon: BriefcaseIcon,
     match: /^\/jobs/,
     subtitle:
-      "Coordinate scheduled work, service progress, and the revenue tied to every job on the board.",
+      "Schedule, manage, update, and review service jobs from creation to completion.",
     title: "Jobs",
   },
   {
     Icon: CheckSquareIcon,
     match: /^\/tasks/,
     subtitle:
-      "Keep follow-ups, reminders, and operational tasks moving so nothing critical slips through the day.",
+      "Track assigned work, complete tasks, review task history, and restore items when needed.",
     title: "Tasks",
   },
   {
     Icon: CalendarBlankIcon,
     match: /^\/calendar/,
     subtitle:
-      "Track appointments, scheduled work, and service commitments across the active workspace.",
+      "View upcoming appointments, scheduled jobs, and time-sensitive work across the workspace.",
     title: "Calendar",
   },
   {
     Icon: RowsIcon,
     match: /^\/pipelines/,
     subtitle:
-      "Work every stage from one board so the team can spot movement, bottlenecks, and next actions faster.",
+      "Customize lead and job stages to match how your business tracks work from start to finish.",
     title: "Pipelines",
   },
-  { Icon: BriefcaseIcon, match: /^\/automations/, title: "Automations" },
-  { Icon: UserCircleIcon, match: /^\/account/, title: "Account" },
-  { Icon: GearSixIcon, match: /^\/settings/, title: "Settings" },
+  {
+    Icon: BriefcaseIcon,
+    match: /^\/automations/,
+    subtitle:
+      "Monitor webhook activity, test n8n connections, and review automation runs across your workspace.",
+    title: "Automations",
+  },
+  {
+    Icon: ChartBarIcon,
+    match: /^\/reports/,
+    subtitle:
+      "Review workspace trends, activity, performance, and operational insights over time.",
+    title: "Reports",
+  },
+  {
+    Icon: UserCircleIcon,
+    match: /^\/account/,
+    subtitle:
+      "Update your profile, avatar, preferences, security options, and workspace access details.",
+    title: "Account",
+  },
+  {
+    Icon: GearSixIcon,
+    match: /^\/settings/,
+    subtitle:
+      "Manage workspace details, branding, modules, templates, and system preferences.",
+    title: "Settings",
+  },
 ];
 
 export function getTopbarRouteMatch(pathname: string) {
@@ -101,11 +175,7 @@ export function TopbarHeading({
         {RouteIcon ? (
           <RouteIcon
             aria-hidden="true"
-            className={`text-[var(--ops-primary-dark)] ${
-              hasStrongTitleTreatment
-                ? "drop-shadow-[0_3px_10px_rgba(37,99,235,0.18)]"
-                : ""
-            }`}
+            className="text-[var(--workspace-primary,var(--ops-primary-dark))]"
             size={hasStrongTitleTreatment ? 26 : 22}
             weight="duotone"
           />

@@ -77,20 +77,28 @@ export function InviteMemberForm() {
   }
 
   return (
-    <Card className="p-5 sm:p-6">
-      <h2 className="font-semibold text-[var(--ops-text)]">Invite Member</h2>
-      <p className="mt-2 text-sm leading-6 text-[var(--ops-text-soft)]">
-        Pending invite record only. Email sending will be connected later.
-      </p>
+    <Card className="p-4 sm:p-5">
+      <div className="space-y-1">
+        <h2 className="font-semibold text-[var(--ops-text)]">Invite Member</h2>
+        <p className="text-sm leading-5 text-[var(--ops-text-soft)]">
+          Pending invite record only. Email sending will be connected later.
+        </p>
+      </div>
 
-      <form className="mt-5 grid gap-4 lg:grid-cols-[1fr_180px_220px_auto]" onSubmit={handleSubmit}>
+      <form
+        className="mt-4 grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_120px_170px_auto]"
+        onSubmit={handleSubmit}
+      >
         {error ? (
-          <p className="rounded-lg bg-[var(--ops-danger-soft)] p-3 text-sm text-[var(--ops-danger)] lg:col-span-4" role="alert">
+          <p
+            className="rounded-lg bg-[var(--ops-danger-soft)] p-2.5 text-sm text-[var(--ops-danger)] lg:col-span-4"
+            role="alert"
+          >
             {error}
           </p>
         ) : null}
         {success ? (
-          <div className="rounded-lg bg-[var(--ops-success-soft)] p-3 text-sm text-[var(--ops-success)] lg:col-span-4">
+          <div className="rounded-lg bg-[var(--ops-success-soft)] p-2.5 text-sm text-[var(--ops-success)] lg:col-span-4">
             <p>{success}</p>
             {inviteLink ? (
               <p className="mt-2 break-all font-medium">{inviteLink}</p>
@@ -103,7 +111,7 @@ export function InviteMemberForm() {
             Email
           </label>
           <input
-            className="mt-2 h-10 w-full rounded-lg border border-[var(--ops-border)] bg-white px-3 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ops-primary)] focus:ring-2 focus:ring-[var(--ops-primary-glow)]"
+            className="mt-1.5 h-10 w-full rounded-lg border border-[var(--ops-border)] bg-white px-3 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ops-primary)] focus:ring-2 focus:ring-[var(--ops-primary-glow)]"
             id="invite-email"
             name="invited_email"
             required
@@ -116,7 +124,7 @@ export function InviteMemberForm() {
             Role
           </label>
           <select
-            className="mt-2 h-10 w-full rounded-lg border border-[var(--ops-border)] bg-white px-3 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ops-primary)] focus:ring-2 focus:ring-[var(--ops-primary-glow)]"
+            className="mt-1.5 h-10 w-full rounded-lg border border-[var(--ops-border)] bg-white px-3 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ops-primary)] focus:ring-2 focus:ring-[var(--ops-primary-glow)]"
             id="invite-role"
             name="role"
             required
@@ -149,7 +157,7 @@ export function InviteMemberForm() {
           />
         </div>
 
-        <div className="flex items-end">
+        <div className="flex items-end lg:justify-end">
           <Button disabled={isSubmitting} type="submit">
             {isSubmitting ? "Creating..." : "Create Invite"}
           </Button>

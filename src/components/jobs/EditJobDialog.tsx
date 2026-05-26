@@ -1,39 +1,43 @@
 "use client";
 
 import { PencilSimpleLineIcon, XIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { AssignmentMemberField } from "@/components/assignments/AssignmentMemberField";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { JobListItem } from "./JobsList";
 
 type EditJobDialogProps = {
+  canAssignRecords?: boolean;
   hideTrigger?: boolean;
   job: JobListItem;
   onOpenChange?: (open: boolean) => void;
+  onJobUpdated?: (job: JobListItem) => void;
   open?: boolean;
 };
 
-type UpdatedJob = {
-  id: string;
-};
-
-function getErrorMessage(response: ApiResponse<UpdatedJob>) {
-  if (response.ok) {
-    return null;
-  }
-
-  return response.error.message;
-}
+type UpdatedJob = Pick<
+  JobListItem,
+  | "assigned_member"
+  | "assigned_member_id"
+  | "estimated_value"
+  | "id"
+  | "location"
+  | "payment_status"
+  | "service_type"
+  | "status"
+  | "title"
+>;
 
 export function EditJobDialog({
+  canAssignRecords = false,
   hideTrigger = false,
   job,
   onOpenChange,
+  onJobUpdated,
   open,
 }: EditJobDialogProps) {
-  const router = useRouter();
   const [internalOpen, setInternalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +71,9 @@ export function EditJobDialog({
     try {
       const response = await fetch(`/api/jobs/${job.id}`, {
         body: JSON.stringify({
+          assigned_member_id: canAssignRecords
+            ? String(formData.get("assigned_member_id") ?? "") || null
+            : undefined,
           estimated_value: Number(formData.get("estimated_value") ?? 0),
           location: String(formData.get("location") ?? ""),
           payment_status: String(
@@ -82,19 +89,41 @@ export function EditJobDialog({
         method: "PATCH",
       });
       const result = (await response.json()) as ApiResponse<UpdatedJob>;
-      const message = getErrorMessage(result);
 
-      if (!response.ok || message) {
+      if (!response.ok || !result.ok) {
         const errorMessage =
-          message ?? "We could not update the job. Please try again.";
+          result.ok
+            ? "We could not update the job. Please try again."
+            : result.error.message;
         setError(errorMessage);
         notify.error("Job could not be updated", errorMessage);
         return;
       }
 
+      const updatedJob = result.data;
+
       setDialogOpen(false);
+      onJobUpdated?.({
+        ...job,
+        assigned_member:
+          updatedJob.assigned_member === undefined
+            ? job.assigned_member
+            : updatedJob.assigned_member,
+        assigned_member_id:
+          updatedJob.assigned_member_id === undefined
+            ? job.assigned_member_id
+            : updatedJob.assigned_member_id,
+        estimated_value:
+          typeof updatedJob.estimated_value === "number"
+            ? updatedJob.estimated_value
+            : Number(updatedJob.estimated_value),
+        location: updatedJob.location ?? null,
+        payment_status: updatedJob.payment_status,
+        service_type: updatedJob.service_type ?? null,
+        status: updatedJob.status,
+        title: updatedJob.title,
+      });
       notify.success("Job updated", "The job details were saved.");
-      router.refresh();
     } catch (caughtError) {
       const errorMessage =
         caughtError instanceof Error
@@ -202,6 +231,13 @@ export function EditJobDialog({
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
+                <AssignmentMemberField
+                  assignedMember={job.assigned_member}
+                  canAssign={canAssignRecords}
+                  defaultValue={job.assigned_member_id}
+                  disabled={isSubmitting}
+                  id={`edit-job-assigned-member-${job.id}`}
+                />
                 <div>
                   <label
                     className="text-sm font-medium text-[var(--ops-text)]"

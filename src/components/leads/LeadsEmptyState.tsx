@@ -3,16 +3,21 @@ import { Card } from "@/components/ui/Card";
 import type { LeadPipelineStageOption } from "@/lib/pipelines/queries";
 import type { Client } from "@/types/domain";
 import { AddLeadDialog } from "./AddLeadDialog";
+import type { LeadListItem } from "./LeadsList";
 
 type LeadsEmptyStateProps = {
+  canAssignRecords: boolean;
   canCreateRecords: boolean;
   clients: Client[];
+  onLeadCreated?: (lead: LeadListItem) => void;
   stageOptions: LeadPipelineStageOption[];
 };
 
 export function LeadsEmptyState({
+  canAssignRecords,
   canCreateRecords,
   clients,
+  onLeadCreated,
   stageOptions,
 }: LeadsEmptyStateProps) {
   return (
@@ -31,7 +36,12 @@ export function LeadsEmptyState({
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
             {canCreateRecords ? (
-              <AddLeadDialog clients={clients} stageOptions={stageOptions} />
+              <AddLeadDialog
+                canAssignRecords={canAssignRecords}
+                clients={clients}
+                onLeadCreated={onLeadCreated}
+                stageOptions={stageOptions}
+              />
             ) : null}
             <p className="text-sm text-[var(--ops-text-muted)]">
               {canCreateRecords

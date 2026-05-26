@@ -1,6 +1,13 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { revalidateTaskPages } from "@/lib/cache/revalidate-app";
 import { z, ZodError } from "zod";
 import {
+  getAssignableMember,
+  getAssignmentFields,
+} from "@/lib/assignments/engine";
+import { triggerAutomationForWorkspace } from "@/lib/n8n/client";
+import {
+  canAssignOperationalRecords,
   canDeleteOperationalRecords,
   canEditOperationalRecords,
 } from "@/lib/permissions/workspace";
@@ -8,8 +15,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 import { updateTaskSchema } from "@/lib/validation/tasks";
 import type { ApiResponse } from "@/types/api";
+import type { AssignableWorkspaceMember } from "@/types/domain";
 
 type TaskResponse = {
+  assigned_member?: AssignableWorkspaceMember | null;
+  assigned_member_id?: string | null;
   completed_at: string | null;
   description?: string | null;
   due_at?: string | null;
@@ -113,8 +123,100 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const rawPayload = (await request.json()) as Record<string, unknown>;
     const payload = updateTaskSchema.parse(rawPayload);
+    const workspaceId = activeWorkspace.context.workspace.id;
     const isStatusOnlyUpdate =
       Object.keys(rawPayload).length === 1 && "status" in rawPayload;
+    const assignmentIncluded = Object.prototype.hasOwnProperty.call(
+      rawPayload,
+      "assigned_member_id",
+    );
+    let assignedMember: AssignableWorkspaceMember | null = null;
+    let assignmentChanged = false;
+    let assignmentFields: Record<string, unknown> = {};
+
+    if (assignmentIncluded) {
+      if (!canAssignOperationalRecords(activeWorkspace.context.role)) {
+        return jsonResponse(
+          {
+            error: {
+              code: "TASK_ASSIGN_FORBIDDEN",
+              message: "Your workspace role cannot assign tasks.",
+            },
+            ok: false,
+          },
+          403,
+        );
+      }
+
+      const nextAssignedMemberId = payload.assigned_member_id ?? null;
+
+      if (nextAssignedMemberId) {
+        assignedMember = await getAssignableMember({
+          memberId: nextAssignedMemberId,
+          supabase,
+          workspaceId,
+        });
+
+        if (!assignedMember) {
+          return jsonResponse(
+            {
+              error: {
+                code: "TASK_ASSIGNEE_INVALID",
+                message:
+                  "Choose an active admin, manager, or staff member from this workspace.",
+              },
+              ok: false,
+            },
+            400,
+          );
+        }
+      }
+
+      const { data: currentTask, error: currentTaskError } = await supabase
+        .from("tasks")
+        .select("id,assigned_member_id")
+        .eq("id", taskIdResult.data)
+        .eq("workspace_id", workspaceId)
+        .maybeSingle<{ assigned_member_id: string | null; id: string }>();
+
+      if (currentTaskError) {
+        return jsonResponse(
+          {
+            error: {
+              code: "TASK_LOOKUP_FAILED",
+              message: "We could not verify the selected task.",
+              details: currentTaskError.message,
+            },
+            ok: false,
+          },
+          500,
+        );
+      }
+
+      if (!currentTask) {
+        return jsonResponse(
+          {
+            error: {
+              code: "TASK_NOT_FOUND",
+              message: "The selected task is not available in this workspace.",
+            },
+            ok: false,
+          },
+          404,
+        );
+      }
+
+      assignmentChanged = currentTask.assigned_member_id !== nextAssignedMemberId;
+
+      if (assignmentChanged) {
+        assignmentFields = getAssignmentFields({
+          actorUserId: user.id,
+          assignedMember,
+          includeNulls: true,
+          targetType: "task",
+        });
+      }
+    }
 
     if (
       !isStatusOnlyUpdate &&
@@ -133,6 +235,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const updates: Record<string, unknown> = {
+      ...assignmentFields,
       updated_by: user.id,
     };
 
@@ -163,12 +266,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const { data: task, error: taskError } = await supabase
-      .from("tasks")
-      .update(updates)
-      .eq("id", taskIdResult.data)
-      .eq("workspace_id", activeWorkspace.context.workspace.id)
-      .select("id,title,description,due_at,priority,status,related_type,completed_at")
-      .single<TaskResponse>();
+    .from("tasks")
+    .update(updates)
+    .eq("id", taskIdResult.data)
+    .eq("workspace_id", workspaceId)
+    .select("id,assigned_member_id,title,description,due_at,priority,status,related_type,completed_at")
+    .single<TaskResponse>();
 
     if (taskError) {
       return jsonResponse(
@@ -190,14 +293,37 @@ export async function PATCH(request: Request, context: RouteContext) {
       entity_id: task.id,
       entity_type: "task",
       metadata: {
+        assigned_member_id: assignmentIncluded
+          ? task.assigned_member_id
+          : undefined,
         status: task.status,
         title: task.title,
       },
-      workspace_id: activeWorkspace.context.workspace.id,
+      workspace_id: workspaceId,
     });
 
+    revalidateTaskPages();
+
+    if (assignmentChanged) {
+      after(() =>
+        triggerAutomationForWorkspace({
+          automationType: "task.assigned",
+          payload: {
+            assigned_member_id: task.assigned_member_id,
+          },
+          relatedId: task.id,
+          relatedType: "task",
+          supabase,
+          workspaceId,
+        }),
+      );
+    }
+
     return jsonResponse({
-      data: task,
+      data: {
+        ...task,
+        assigned_member: assignmentIncluded ? assignedMember : undefined,
+      },
       ok: true,
     });
   } catch (error) {
@@ -326,6 +452,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
     },
     workspace_id: activeWorkspace.context.workspace.id,
   });
+
+  revalidateTaskPages();
 
   return jsonResponse({
     data: task,

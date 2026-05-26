@@ -11,11 +11,12 @@ export function RestrictedSettingsState() {
             <ShieldWarningIcon aria-hidden="true" size={26} weight="duotone" />
           </div>
           <h1 className="mt-5 text-2xl font-semibold tracking-normal text-[var(--ops-text)]">
-            Settings are only available to workspace owners and admins.
+            Workspace settings are restricted.
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--ops-text-soft)]">
-            You can still use the dashboard and operational tools available to
-            your role.
+            Personal preferences still live on your account. Workspace-wide
+            branding, modules, pipeline configuration, and access controls stay
+            in Owner Console.
           </p>
           <Link
             className="mt-6 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--ops-primary)] px-4 text-sm font-semibold text-white shadow-[0_12px_28px_var(--ops-primary-glow)] transition hover:bg-[var(--ops-primary-dark)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
@@ -30,8 +31,8 @@ export function RestrictedSettingsState() {
             Access model
           </p>
           <div className="mt-4 space-y-3 text-sm text-[var(--ops-text-soft)]">
-            <p>Owners and admins manage workspace settings.</p>
-            <p>Managers, staff, and viewers use operational tools by role.</p>
+            <p>Owners manage workspace-wide controls in Owner Console.</p>
+            <p>All authenticated roles manage their own preferences from the account surface.</p>
           </div>
         </div>
       </div>

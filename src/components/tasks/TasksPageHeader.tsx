@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { TaskListItem } from "./TasksList";
 import { AddTaskDialog } from "./AddTaskDialog";
 
 export type TaskViewFilter = "today" | "upcoming" | "whats-left";
@@ -8,8 +9,10 @@ type TasksPageHeaderProps = {
   activeFilter: TaskViewFilter;
   activeTaskCount: number;
   activeView: TaskPageView;
+  canAssignRecords: boolean;
   canCreateRecords: boolean;
   historyTaskCount: number;
+  onTaskCreated?: (task: TaskListItem) => void;
 };
 
 const filters: Array<{
@@ -25,13 +28,15 @@ export function TasksPageHeader({
   activeFilter,
   activeTaskCount,
   activeView,
+  canAssignRecords,
   canCreateRecords,
   historyTaskCount,
+  onTaskCreated,
 }: TasksPageHeaderProps) {
   return (
     <section className="space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex w-fit rounded-xl border border-[var(--ops-border)] bg-white p-1 shadow-sm">
+        <div className="inline-flex w-fit items-center gap-1">
           <Link
             className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)] ${
               activeView === "active"
@@ -73,7 +78,11 @@ export function TasksPageHeader({
         </div>
         <div className="flex shrink-0 items-center">
           {activeView === "active" && canCreateRecords ? (
-            <AddTaskDialog className="h-9" />
+            <AddTaskDialog
+              canAssignRecords={canAssignRecords}
+              className="h-9"
+              onTaskCreated={onTaskCreated}
+            />
           ) : null}
         </div>
       </div>

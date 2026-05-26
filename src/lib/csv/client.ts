@@ -95,3 +95,9 @@ export function downloadCsv({
   link.click();
   URL.revokeObjectURL(url);
 }
+
+export function getDatedCsvFilename(prefix: string, date = new Date()) {
+  const isoDate = date.toISOString().slice(0, 10);
+
+  return `${prefix}-${isoDate}.csv`;
+}

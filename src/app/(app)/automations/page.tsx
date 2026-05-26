@@ -61,25 +61,9 @@ export default async function AutomationsPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <Card className="p-5">
-        <div className="flex flex-col gap-2">
-          <p className="text-sm font-semibold text-[var(--workspace-primary,var(--ops-primary))]">
-            Workflow bridge
-          </p>
-          <h1 className="text-2xl font-semibold text-[var(--ops-text)]">
-            Automations
-          </h1>
-          <p className="max-w-3xl text-sm leading-6 text-[var(--ops-text-soft)]">
-            Monitor workflow delivery, n8n handoff status, and automation
-            reliability for the active workspace.
-          </p>
-        </div>
-      </Card>
-      <AutomationsPanel
-        isN8nConfigured={isN8nConfigured()}
-        logs={data ?? []}
-      />
-    </div>
+    <AutomationsPanel
+      isN8nConfigured={isN8nConfigured()}
+      logs={data ?? []}
+    />
   );
 }

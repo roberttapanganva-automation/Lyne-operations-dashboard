@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateLeadPages } from "@/lib/cache/revalidate-app";
 import { ZodError } from "zod";
 import { canDeleteOperationalRecords } from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
@@ -154,6 +155,8 @@ export async function POST(request: Request) {
           workspace_id: workspaceId,
         })),
       );
+
+      revalidateLeadPages();
     }
 
     return jsonResponse({

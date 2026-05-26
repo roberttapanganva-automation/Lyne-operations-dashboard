@@ -1,8 +1,7 @@
 "use client";
 
 import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DateTimeCell, DateTimeHeader } from "@/components/ui/DateTimeCell";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
@@ -12,6 +11,10 @@ import type { TaskListItem, TaskRelatedType } from "./TasksList";
 
 type TaskHistoryListProps = {
   canRestoreTasks: boolean;
+  onTaskStatusOptimistic?: (
+    task: TaskListItem,
+    nextStatus: "done" | "todo",
+  ) => (() => void) | void;
   tasks: TaskListItem[];
 };
 
@@ -28,12 +31,8 @@ function formatRelatedType(value: TaskRelatedType) {
 }
 
 function formatAssignedUser(task: TaskListItem) {
-  if (task.assigned_user?.full_name) {
-    return task.assigned_user.full_name;
-  }
-
-  if (task.assigned_to) {
-    return "Assigned user";
+  if (task.assigned_member?.display_name) {
+    return task.assigned_member.display_name;
   }
 
   return "Unassigned";
@@ -41,20 +40,16 @@ function formatAssignedUser(task: TaskListItem) {
 
 export function TaskHistoryList({
   canRestoreTasks,
+  onTaskStatusOptimistic,
   tasks,
 }: TaskHistoryListProps) {
-  const router = useRouter();
-  const [visibleTasks, setVisibleTasks] = useState(tasks);
   const [restoringTaskId, setRestoringTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setVisibleTasks(tasks);
-  }, [tasks]);
 
   async function restoreTask(task: TaskListItem) {
     setError(null);
     setRestoringTaskId(task.id);
+    const rollback = onTaskStatusOptimistic?.(task, "todo");
 
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
@@ -70,24 +65,22 @@ export function TaskHistoryList({
         const message = result.ok
           ? "We could not restore the task. Please try again."
           : result.error.message;
+        rollback?.();
         setError(message);
         notify.error("Task restore failed", message);
         return;
       }
 
-      setVisibleTasks((current) =>
-        current.filter((currentTask) => currentTask.id !== task.id),
-      );
       notify.success(
         "Task restored",
         "The task was moved back to active work.",
       );
-      router.refresh();
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
           ? caughtError.message
           : "We could not restore the task. Please try again.";
+      rollback?.();
       setError(message);
       notify.error("Task restore failed", message);
     } finally {
@@ -95,7 +88,7 @@ export function TaskHistoryList({
     }
   }
 
-  if (visibleTasks.length === 0) {
+  if (tasks.length === 0) {
     return (
       <div className="px-5 py-10 text-center sm:px-6">
         <h2 className="text-base font-semibold text-[var(--ops-text)]">
@@ -145,8 +138,13 @@ export function TaskHistoryList({
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--ops-border)] bg-white">
-            {visibleTasks.map((task) => (
-              <tr className="align-top" key={task.id}>
+            {tasks.map((task) => (
+              <tr
+                className={`align-top transition ${
+                  restoringTaskId === task.id ? "opacity-70" : ""
+                }`}
+                key={task.id}
+              >
                 <td className="px-5 py-4 sm:px-6">
                   <p className="font-medium text-[var(--ops-text)]">
                     {task.title}
@@ -199,8 +197,13 @@ export function TaskHistoryList({
       </div>
 
       <div className="divide-y divide-[var(--ops-border)] xl:hidden">
-        {visibleTasks.map((task) => (
-          <article className="p-5" key={task.id}>
+        {tasks.map((task) => (
+          <article
+            className={`p-5 transition ${
+              restoringTaskId === task.id ? "opacity-70" : ""
+            }`}
+            key={task.id}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="font-semibold text-[var(--ops-text)]">

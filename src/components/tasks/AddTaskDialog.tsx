@@ -1,35 +1,43 @@
 "use client";
 
 import { CheckSquareIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { AssignmentMemberField } from "@/components/assignments/AssignmentMemberField";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
+import type { TaskListItem } from "./TasksList";
 
 type AddTaskDialogProps = {
+  canAssignRecords?: boolean;
   className?: string;
+  onTaskCreated?: (task: TaskListItem) => void;
   variant?: "primary" | "secondary" | "ghost";
 };
 
-type CreatedTask = {
-  id: string;
-};
-
-function getErrorMessage(response: ApiResponse<CreatedTask>) {
-  if (response.ok) {
-    return null;
-  }
-
-  return response.error.message;
-}
+type CreatedTask = Pick<
+  TaskListItem,
+  | "assigned_member"
+  | "assigned_member_id"
+  | "completed_at"
+  | "created_at"
+  | "description"
+  | "due_at"
+  | "id"
+  | "priority"
+  | "related_id"
+  | "related_type"
+  | "status"
+  | "title"
+>;
 
 export function AddTaskDialog({
+  canAssignRecords = false,
   className = "",
+  onTaskCreated,
   variant = "primary",
 }: AddTaskDialogProps) {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,6 +69,9 @@ export function AddTaskDialog({
       dueDateValue && dueTime ? `${dueDateValue}T${dueTime}` : "";
 
     const payload = {
+      assigned_member_id: canAssignRecords
+        ? String(formData.get("assigned_member_id") ?? "") || null
+        : undefined,
       description: String(formData.get("description") ?? ""),
       due_at: dueAt ? new Date(dueAt).toISOString() : undefined,
       priority: String(formData.get("priority") ?? "normal"),
@@ -78,22 +89,38 @@ export function AddTaskDialog({
         method: "POST",
       });
       const result = (await response.json()) as ApiResponse<CreatedTask>;
-      const message = getErrorMessage(result);
 
-      if (!response.ok || message) {
+      if (!response.ok || !result.ok) {
         const errorMessage =
-          message ?? "We could not create the task. Please try again.";
+          result.ok
+            ? "We could not create the task. Please try again."
+            : result.error.message;
         setError(errorMessage);
         notify.error("Task could not be added", errorMessage);
         return;
       }
 
+      const createdTask = result.data;
+
       formRef.current?.reset();
       setDueDate(undefined);
       setDueTime("");
       setIsOpen(false);
+      onTaskCreated?.({
+        assigned_member: createdTask.assigned_member ?? null,
+        assigned_member_id: createdTask.assigned_member_id ?? null,
+        completed_at: createdTask.completed_at,
+        created_at: createdTask.created_at,
+        description: createdTask.description,
+        due_at: createdTask.due_at,
+        id: createdTask.id,
+        priority: createdTask.priority,
+        related_id: createdTask.related_id,
+        related_type: createdTask.related_type,
+        status: createdTask.status,
+        title: createdTask.title,
+      });
       notify.success("Task added", "The task was added to your workspace.");
-      router.refresh();
     } catch (caughtError) {
       const errorMessage =
         caughtError instanceof Error
@@ -280,6 +307,14 @@ export function AddTaskDialog({
                     <option value="client">Client</option>
                   </select>
                 </div>
+
+                {canAssignRecords ? (
+                  <AssignmentMemberField
+                    canAssign={canAssignRecords}
+                    disabled={isSubmitting}
+                    id="task-assigned-member"
+                  />
+                ) : null}
               </div>
 
               <div>
@@ -308,7 +343,7 @@ export function AddTaskDialog({
                   Cancel
                 </Button>
                 <Button disabled={isSubmitting} type="submit">
-                  {isSubmitting ? "Creating..." : "Create task"}
+                  {isSubmitting ? "Adding..." : "Add task"}
                 </Button>
               </div>
             </form>

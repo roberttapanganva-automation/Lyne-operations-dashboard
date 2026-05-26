@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import type { ApiResponse } from "@/types/api";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { AssignmentSelect } from "@/components/assignments/AssignmentSelect";
 import { BulkActionBar } from "@/components/ui/BulkActionBar";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { DateTimeCell, DateTimeHeader } from "@/components/ui/DateTimeCell";
@@ -15,7 +15,11 @@ import {
   type PaymentStatus,
 } from "./PaymentStatusBadge";
 
+import type { AssignableWorkspaceMember } from "@/types/domain";
+
 export type JobListItem = {
+  assigned_member: AssignableWorkspaceMember | null;
+  assigned_member_id: string | null;
   client: {
     email: string | null;
     name: string;
@@ -34,9 +38,14 @@ export type JobListItem = {
 };
 
 type JobsListProps = {
+  canAssignRecords: boolean;
   canCreateRecords: boolean;
   canDeleteRecords: boolean;
+  currentMemberId: string | null;
   jobs: JobListItem[];
+  onJobCreated?: (job: JobListItem) => void;
+  onJobUpdated?: (job: JobListItem) => void;
+  onJobsDeleted?: (jobIds: string[]) => void;
 };
 
 type BulkDeleteResponse = {
@@ -62,30 +71,52 @@ function formatCurrency(value: number) {
 }
 
 export function JobsList({
+  canAssignRecords,
   canCreateRecords,
   canDeleteRecords,
+  currentMemberId,
   jobs,
+  onJobCreated,
+  onJobUpdated,
+  onJobsDeleted,
 }: JobsListProps) {
-  const router = useRouter();
   const [editingJob, setEditingJob] = useState<JobListItem | null>(null);
-  const [visibleJobs, setVisibleJobs] = useState(jobs);
+  const [assignmentView, setAssignmentView] = useState<
+    "all" | "assigned_to_me" | "unassigned"
+  >("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
   const [bulkDeleteSuccess, setBulkDeleteSuccess] = useState<string | null>(null);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
-  useEffect(() => {
-    setVisibleJobs(jobs);
-  }, [jobs]);
-
-  if (visibleJobs.length === 0) {
-    return <JobsEmptyState canCreateRecords={canCreateRecords} />;
+  if (jobs.length === 0) {
+    return (
+      <JobsEmptyState
+        canAssignRecords={canAssignRecords}
+        canCreateRecords={canCreateRecords}
+        onJobCreated={onJobCreated}
+      />
+    );
   }
 
+  const filteredJobs = jobs.filter((job) => {
+    if (assignmentView === "assigned_to_me") {
+      return Boolean(currentMemberId && job.assigned_member_id === currentMemberId);
+    }
+
+    if (assignmentView === "unassigned") {
+      return !job.assigned_member_id;
+    }
+
+    return true;
+  });
   const allSelected =
-    visibleJobs.length > 0 &&
-    visibleJobs.every((job) => selectedIds.includes(job.id));
+    filteredJobs.length > 0 &&
+    filteredJobs.every((job) => selectedIds.includes(job.id));
+  const visibleSelectedIds = selectedIds.filter((selectedId) =>
+    filteredJobs.some((job) => job.id === selectedId),
+  );
 
   function openJobEditor(job: JobListItem) {
     if (!canCreateRecords) {
@@ -97,11 +128,17 @@ export function JobsList({
 
   function toggleSelectAll() {
     if (allSelected) {
-      setSelectedIds([]);
+      setSelectedIds((current) =>
+        current.filter(
+          (selectedId) => !filteredJobs.some((job) => job.id === selectedId),
+        ),
+      );
       return;
     }
 
-    setSelectedIds(visibleJobs.map((job) => job.id));
+    setSelectedIds((current) => [
+      ...new Set([...current, ...filteredJobs.map((job) => job.id)]),
+    ]);
   }
 
   function toggleJobSelection(jobId: string) {
@@ -126,7 +163,7 @@ export function JobsList({
       const response = await fetch("/api/jobs/bulk", {
         body: JSON.stringify({
           action: "delete",
-          ids: selectedIds,
+          ids: visibleSelectedIds,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -145,10 +182,7 @@ export function JobsList({
         return;
       }
 
-      const deletedIds = new Set(result.data.deleted.map((job) => job.id));
-      setVisibleJobs((current) =>
-        current.filter((job) => !deletedIds.has(job.id)),
-      );
+      onJobsDeleted?.(result.data.deleted.map((job) => job.id));
       setBulkDeleteSuccess(
         result.data.deletedCount === 1
           ? "Job deleted successfully."
@@ -162,7 +196,6 @@ export function JobsList({
       );
       clearSelection();
       setBulkDeleteOpen(false);
-      router.refresh();
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -184,7 +217,7 @@ export function JobsList({
           entityLabel="job"
           onClearSelection={clearSelection}
           onDelete={() => setBulkDeleteOpen(true)}
-          selectedCount={selectedIds.length}
+          selectedCount={visibleSelectedIds.length}
         />
         {bulkDeleteError ? (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--ops-danger)]">
@@ -196,9 +229,33 @@ export function JobsList({
             {bulkDeleteSuccess}
           </p>
         ) : null}
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "all", label: "All" },
+            { key: "assigned_to_me", label: "Assigned to me" },
+            { key: "unassigned", label: "Unassigned" },
+          ].map((view) => (
+            <button
+              className={`inline-flex h-9 items-center rounded-full px-3 text-sm font-semibold transition ${
+                assignmentView === view.key
+                  ? "bg-[var(--workspace-primary-soft,var(--ops-primary-soft))] text-[var(--workspace-primary,var(--ops-primary-dark))]"
+                  : "bg-[var(--ops-card-soft)] text-[var(--ops-text-soft)] hover:text-[var(--ops-text)]"
+              }`}
+              key={view.key}
+              onClick={() =>
+                setAssignmentView(
+                  view.key as "all" | "assigned_to_me" | "unassigned",
+                )
+              }
+              type="button"
+            >
+              {view.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="hidden overflow-x-auto xl:block">
+      <div className="ops-density-surface hidden overflow-x-auto xl:block">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--ops-card-soft)] text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
             <tr>
@@ -213,6 +270,9 @@ export function JobsList({
               </th>
               <th className="px-5 py-3 sm:px-6" scope="col">
                 Job
+              </th>
+              <th className="px-5 py-3" scope="col">
+                Assigned to
               </th>
               <th className="px-5 py-3" scope="col">
                 Status
@@ -235,7 +295,7 @@ export function JobsList({
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--ops-border)] bg-white">
-            {visibleJobs.map((job) => (
+            {filteredJobs.map((job) => (
               <tr
                 className={canCreateRecords ? "cursor-pointer transition hover:bg-[var(--ops-card-soft)]" : ""}
                 key={job.id}
@@ -263,6 +323,15 @@ export function JobsList({
                   </p>
                 </td>
                 <td className="px-5 py-4">
+                  <AssignmentSelect
+                    assignedMember={job.assigned_member}
+                    assignedMemberId={job.assigned_member_id}
+                    canAssign={canAssignRecords}
+                    recordId={job.id}
+                    targetType="job"
+                  />
+                </td>
+                <td className="px-5 py-4">
                   <JobStatusBadge status={job.status} />
                 </td>
                 <td className="px-5 py-4 text-[var(--ops-text-soft)]">
@@ -287,9 +356,9 @@ export function JobsList({
       </div>
 
       <div className="divide-y divide-[var(--ops-border)] xl:hidden">
-        {visibleJobs.map((job) => (
+        {filteredJobs.map((job) => (
           <article
-            className={canCreateRecords ? "cursor-pointer p-5 transition hover:bg-[var(--ops-card-soft)]" : "p-5"}
+            className={canCreateRecords ? "ops-density-card cursor-pointer p-5 transition hover:bg-[var(--ops-card-soft)]" : "ops-density-card p-5"}
             key={job.id}
             onDoubleClick={() => openJobEditor(job)}
             title={canCreateRecords ? "Double-click to edit job" : undefined}
@@ -318,6 +387,20 @@ export function JobsList({
             </div>
 
             <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
+                  Assigned to
+                </p>
+                <div className="mt-1">
+                  <AssignmentSelect
+                    assignedMember={job.assigned_member}
+                    assignedMemberId={job.assigned_member_id}
+                    canAssign={canAssignRecords}
+                    recordId={job.id}
+                    targetType="job"
+                  />
+                </div>
+              </div>
               <div>
                 <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
                   Schedule
@@ -356,8 +439,10 @@ export function JobsList({
       </div>
       {editingJob ? (
         <EditJobDialog
+          canAssignRecords={canAssignRecords}
           hideTrigger
           job={editingJob}
+          onJobUpdated={onJobUpdated}
           onOpenChange={(open) => {
             if (!open) {
               setEditingJob(null);
@@ -367,17 +452,17 @@ export function JobsList({
         />
       ) : null}
       <ConfirmDeleteDialog
-        confirmLabel={selectedIds.length === 1 ? "Delete job" : "Delete jobs"}
+        confirmLabel={visibleSelectedIds.length === 1 ? "Delete job" : "Delete jobs"}
         description="This will permanently remove the selected job records from this workspace. Use this only for accidental or unwanted job records."
         isSubmitting={isBulkDeleting}
-        itemCount={selectedIds.length}
+        itemCount={visibleSelectedIds.length}
         onCancel={() => {
           if (!isBulkDeleting) {
             setBulkDeleteOpen(false);
           }
         }}
         onConfirm={deleteSelectedJobs}
-        open={bulkDeleteOpen}
+        open={bulkDeleteOpen && visibleSelectedIds.length > 0}
         title="Delete selected jobs?"
       />
     </>

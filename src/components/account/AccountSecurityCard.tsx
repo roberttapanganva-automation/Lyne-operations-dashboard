@@ -9,10 +9,14 @@ import { createClient } from "@/lib/supabase/client";
 import { notify } from "@/lib/ui/toast";
 
 type AccountSecurityCardProps = {
+  embedded?: boolean;
   email: string | null;
 };
 
-export function AccountSecurityCard({ email }: AccountSecurityCardProps) {
+export function AccountSecurityCard({
+  embedded = false,
+  email,
+}: AccountSecurityCardProps) {
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
@@ -60,8 +64,8 @@ export function AccountSecurityCard({ email }: AccountSecurityCardProps) {
     }
   }
 
-  return (
-    <Card className="p-5 sm:p-6">
+  const content = (
+    <>
       <div>
         <h2 className="text-base font-semibold text-[var(--ops-text)]">
           Security
@@ -114,6 +118,12 @@ export function AccountSecurityCard({ email }: AccountSecurityCardProps) {
         </Button>
         <SignOutButton variant="secondary" />
       </div>
-    </Card>
+    </>
   );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <Card className="p-5 sm:p-6">{content}</Card>;
 }

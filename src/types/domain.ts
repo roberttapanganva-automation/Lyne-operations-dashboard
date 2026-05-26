@@ -63,6 +63,24 @@ export type UserThemePreference = {
   workspaceDefaultThemeMode: ThemeMode;
 };
 
+export type UserPreferences = {
+  date_format: "MMM d, yyyy" | "MM/dd/yyyy" | "dd/MM/yyyy" | "yyyy-MM-dd";
+  default_landing_page:
+    | "/dashboard"
+    | "/leads"
+    | "/jobs"
+    | "/tasks"
+    | "/calendar"
+    | "/pipelines"
+    | "/automations";
+  in_app_notifications_enabled: boolean;
+  reduce_motion: boolean;
+  table_density: "compact" | "comfortable" | "spacious";
+  time_format: "12h" | "24h";
+  timezone: string;
+  week_starts_on: "sunday" | "monday";
+};
+
 export type WorkspaceModuleSettings = WorkspaceModules;
 
 export type PipelineEntityType = "lead" | "job";
@@ -170,6 +188,58 @@ export type PipelineMoveRequest = {
   entity_type: PipelineEntityType;
   record_id: string;
   target_stage_id: string;
+};
+
+export type AssignmentTargetType = "lead" | "job" | "task";
+
+export type AssignmentRule = {
+  auto_create_task: boolean;
+  created_at: string;
+  created_by: string | null;
+  enabled: boolean;
+  entity_type: AssignmentTargetType;
+  id: string;
+  last_assigned_member_id: string | null;
+  notify_assignee: boolean;
+  strategy: "round_robin";
+  task_due_offset_minutes: number;
+  updated_at: string;
+  updated_by: string | null;
+  workspace_id: string;
+};
+
+export type AssignmentRuleMember = {
+  active: boolean;
+  assignment_rule_id: string;
+  created_at: string;
+  id: string;
+  order_index: number;
+  updated_at: string;
+  workspace_id: string;
+  workspace_member_id: string;
+};
+
+export type AssignableWorkspaceMember = {
+  display_name: string;
+  email: string | null;
+  full_name: string | null;
+  id: string;
+  role: "owner" | "admin" | "manager" | "staff";
+  status: "active";
+  user_id: string;
+  workspace_id: string;
+};
+
+export type AssignmentResult = {
+  assigned_member: AssignableWorkspaceMember | null;
+  assigned_member_id: string | null;
+  auto_created_task_id?: string | null;
+  error?: string | null;
+  notify_assignee?: boolean;
+  ok: boolean;
+  record_id: string;
+  target_type: AssignmentTargetType;
+  warning?: string | null;
 };
 
 export type WorkspaceSettingsData = {

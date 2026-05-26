@@ -11,7 +11,7 @@ import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { BulkActionBar } from "@/components/ui/BulkActionBar";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
-import { downloadCsv } from "@/lib/csv/client";
+import { downloadCsv, getDatedCsvFilename } from "@/lib/csv/client";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { ClientListItem } from "@/types/domain";
@@ -180,6 +180,7 @@ export function ContactsPanel({
   clients,
 }: ContactsPanelProps) {
   const router = useRouter();
+  const [localClients, setLocalClients] = useState(clients);
   const [activeView, setActiveView] = useState<ContactView>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<ContactSort>("newest");
@@ -209,22 +210,22 @@ export function ContactsPanel({
 
   const counts = useMemo(
     () => ({
-      all: clients.length,
-      customers: clients.filter((client) => client.relationship_label === "Customer")
+      all: localClients.length,
+      customers: localClients.filter((client) => client.relationship_label === "Customer")
         .length,
-      repeat: clients.filter(
+      repeat: localClients.filter(
         (client) => client.relationship_label === "Repeat customer",
       ).length,
-      saved: clients.filter((client) => client.relationship_label === "Saved contact")
+      saved: localClients.filter((client) => client.relationship_label === "Saved contact")
         .length,
     }),
-    [clients],
+    [localClients],
   );
 
   const filteredClients = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    let nextClients = clients.filter((client) => {
+    let nextClients = localClients.filter((client) => {
       if (activeView === "customers") {
         return client.relationship_label === "Customer";
       }
@@ -339,11 +340,14 @@ export function ContactsPanel({
     }
 
     return sortedClients;
-  }, [activeView, advancedFilters, clients, searchQuery, sortBy]);
+  }, [activeView, advancedFilters, localClients, searchQuery, sortBy]);
 
   const allFilteredSelected =
     filteredClients.length > 0 &&
     filteredClients.every((client) => selectedIds.includes(client.id));
+  const visibleSelectedIds = selectedIds.filter((selectedId) =>
+    filteredClients.some((client) => client.id === selectedId),
+  );
 
   function toggleSelectAll() {
     if (allFilteredSelected) {
@@ -397,7 +401,7 @@ export function ContactsPanel({
       const response = await fetch("/api/clients/bulk", {
         body: JSON.stringify({
           action: "delete",
-          ids: selectedIds,
+          ids: visibleSelectedIds,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -422,9 +426,12 @@ export function ContactsPanel({
           ? "The selected contact was removed."
           : "The selected contacts were removed.",
       );
+      const deletedIds = new Set(visibleSelectedIds);
+      setLocalClients((current) =>
+        current.filter((client) => !deletedIds.has(client.id)),
+      );
       clearSelection();
       setBulkDeleteOpen(false);
-      router.refresh();
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -439,7 +446,7 @@ export function ContactsPanel({
 
   function exportVisibleContacts() {
     downloadCsv({
-      filename: "opspilot-contacts.csv",
+      filename: getDatedCsvFilename("opspilot-contacts"),
       headers: [
         "name",
         "phone",
@@ -465,6 +472,19 @@ export function ContactsPanel({
         source: client.source ?? "",
       })),
     });
+  }
+
+  function handleContactCreated(client: ClientListItem) {
+    setLocalClients((current) => [client, ...current]);
+  }
+
+  function handleContactUpdated(client: ClientListItem) {
+    setLocalClients((current) =>
+      current.map((currentClient) =>
+        currentClient.id === client.id ? client : currentClient,
+      ),
+    );
+    setEditingClient((current) => (current?.id === client.id ? client : current));
   }
 
   const advancedFilterCount = countContactAdvancedFilters(advancedFilters);
@@ -521,6 +541,9 @@ export function ContactsPanel({
                 {counts.all} {counts.all === 1 ? "Contact" : "Contacts"}
               </span>
             </div>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--ops-text-soft)]">
+              Keep customer details organized and ready for follow-up, scheduling, and service history.
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -533,7 +556,9 @@ export function ContactsPanel({
                 triggerId="contacts-import-trigger"
               />
             ) : null}
-            {canCreateRecords ? <AddContactDialog /> : null}
+            {canCreateRecords ? (
+              <AddContactDialog onContactCreated={handleContactCreated} />
+            ) : null}
             <CrmActionsMenu
               ariaLabel="More contact actions"
               items={[
@@ -666,7 +691,7 @@ export function ContactsPanel({
             entityLabel="contact"
             onClearSelection={clearSelection}
             onDelete={() => setBulkDeleteOpen(true)}
-            selectedCount={selectedIds.length}
+            selectedCount={visibleSelectedIds.length}
           />
           {bulkDeleteError ? (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--ops-danger)]">
@@ -676,8 +701,8 @@ export function ContactsPanel({
         </div>
       </div>
 
-      {clients.length === 0 ? (
-        <Card className="overflow-hidden">
+      {localClients.length === 0 ? (
+        <Card className="ops-density-surface overflow-hidden">
           <div className="px-5 py-10 sm:px-6">
             <div className="rounded-xl border border-dashed border-[var(--ops-border)] bg-[var(--ops-card-soft)] px-6 py-10 text-center">
               <p className="text-base font-semibold text-[var(--ops-text)]">
@@ -689,7 +714,7 @@ export function ContactsPanel({
               </p>
               {canCreateRecords ? (
                 <div className="mt-5 flex justify-center">
-                  <AddContactDialog />
+                  <AddContactDialog onContactCreated={handleContactCreated} />
                 </div>
               ) : null}
             </div>
@@ -832,7 +857,7 @@ export function ContactsPanel({
           <div className="divide-y divide-[var(--ops-border)] lg:hidden">
             {filteredClients.map((client) => (
               <article
-                className={`space-y-4 p-5 ${canCreateRecords ? "cursor-pointer transition hover:bg-[var(--ops-card-soft)]" : ""}`}
+                className={`ops-density-card space-y-4 p-5 ${canCreateRecords ? "cursor-pointer transition hover:bg-[var(--ops-card-soft)]" : ""}`}
                 key={client.id}
                 onDoubleClick={() => openContactEditor(client)}
                 title={canCreateRecords ? "Double-click to edit contact" : undefined}
@@ -902,19 +927,20 @@ export function ContactsPanel({
       <ConfirmDeleteDialog
         confirmLabel="Delete contacts"
         isSubmitting={isBulkDeleting}
-        itemCount={selectedIds.length}
+        itemCount={visibleSelectedIds.length}
         onCancel={() => {
           if (!isBulkDeleting) {
             setBulkDeleteOpen(false);
           }
         }}
         onConfirm={deleteSelectedContacts}
-        open={bulkDeleteOpen}
+        open={bulkDeleteOpen && visibleSelectedIds.length > 0}
         title="Delete selected contacts?"
       />
       <EditContactDialog
         client={editingClient}
         onClose={() => setEditingClient(null)}
+        onContactUpdated={handleContactUpdated}
         open={Boolean(editingClient)}
       />
     </div>

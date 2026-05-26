@@ -1,11 +1,13 @@
-import { GearSixIcon, GlobeHemisphereWestIcon } from "@phosphor-icons/react/ssr";
+import { GlobeHemisphereWestIcon } from "@phosphor-icons/react/ssr";
 import { AccountActivityCard } from "@/components/account/AccountActivityCard";
 import { AccountAvatarCard } from "@/components/account/AccountAvatarCard";
 import { AccountProfileForm } from "@/components/account/AccountProfileForm";
 import { AccountSecurityCard } from "@/components/account/AccountSecurityCard";
+import { PreferencesForm } from "@/components/settings/PreferencesForm";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getCurrentAccountSummary } from "@/lib/account/queries";
+import { getCurrentUserPreferences } from "@/lib/profile/preferences";
 
 function formatRoleLabel(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, " ");
@@ -16,7 +18,10 @@ function formatStatusLabel(value: string) {
 }
 
 export default async function AccountPage() {
-  const account = await getCurrentAccountSummary();
+  const [account, preferences] = await Promise.all([
+    getCurrentAccountSummary(),
+    getCurrentUserPreferences(),
+  ]);
 
   if (!account) {
     return (
@@ -31,53 +36,34 @@ export default async function AccountPage() {
 
   return (
     <div className="space-y-5">
-      <Card className="p-5 sm:p-6">
-        <div className="flex flex-col gap-2">
-          <p className="text-sm font-semibold text-[var(--workspace-primary,var(--ops-primary))]">
-            Personal profile
-          </p>
-          <h1 className="text-2xl font-semibold text-[var(--ops-text)]">
-            Account
-          </h1>
-          <p className="max-w-3xl text-sm leading-6 text-[var(--ops-text-soft)]">
-            Manage your profile, avatar, preferences, and workspace access.
-          </p>
-        </div>
-      </Card>
-
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <div className="space-y-5">
-          <AccountAvatarCard
-            avatarUrl={account.avatarUrl}
-            displayName={account.displayName}
-            email={account.email}
-            fullName={account.fullName}
-          />
-          <AccountProfileForm
-            email={account.email}
-            fullName={account.fullName}
-            timezone={account.timezone}
-          />
+          <Card className="overflow-hidden">
+            <div className="p-5 sm:p-6">
+              <AccountAvatarCard
+                avatarUrl={account.avatarUrl}
+                displayName={account.displayName}
+                email={account.email}
+                embedded
+                fullName={account.fullName}
+              />
+            </div>
+            <div className="border-t border-[var(--ops-border)] p-5 sm:p-6">
+              <AccountProfileForm
+                email={account.email}
+                embedded
+                fullName={account.fullName}
+                timezone={account.timezone}
+              />
+            </div>
+            <div className="border-t border-[var(--ops-border)] p-5 sm:p-6">
+              <AccountSecurityCard email={account.email} embedded />
+            </div>
+          </Card>
         </div>
 
         <div className="space-y-5">
-          <Card className="p-5 sm:p-6">
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--ops-primary-soft)] text-[var(--workspace-primary,var(--ops-primary-dark))]">
-                <GearSixIcon aria-hidden="true" size={20} weight="duotone" />
-              </span>
-              <div>
-                <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                  Preferences
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-[var(--ops-text-soft)]">
-                  Your current timezone is <span className="font-medium text-[var(--ops-text)]">{account.timezone}</span>. More personal preferences will be added later.
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <AccountSecurityCard email={account.email} />
+          <AccountActivityCard activity={account.activity} />
 
           <Card className="p-5 sm:p-6">
             <div className="flex items-start gap-3">
@@ -137,7 +123,7 @@ export default async function AccountPage() {
             )}
           </Card>
 
-          <AccountActivityCard activity={account.activity} />
+          {preferences ? <PreferencesForm preferences={preferences} /> : null}
         </div>
       </div>
     </div>

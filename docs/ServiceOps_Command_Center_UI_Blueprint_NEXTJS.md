@@ -2,622 +2,267 @@
 
 ## Purpose
 
-This is the revised UI/UX blueprint for **OpsPilot / ServiceOps Command Center**.
+This is the current UI and UX direction for OpsPilot / ServiceOps Command Center.
 
-It preserves the generated dashboard image direction and aligns the frontend implementation with:
+## Current UI Direction
 
-```text
-Next.js App Router + TypeScript + Tailwind CSS
-```
+- premium SaaS utility dashboard
+- dark navy sidebar
+- light main workspace
+- compact spacing for repeated operational work
+- rounded cards and restrained shadows
+- responsive mobile layout
+- Phosphor Icons
+- real data or empty states only
 
----
+## App Shell
 
-# Current Implementation Snapshot
+### Desktop
 
-- The normal app shell keeps the dark navy sidebar and light main workspace.
-- The topbar includes search, messages, notifications, personal theme mode, and icon-only sign out with confirmation.
-- Owner Console is a separate owner-only route group with dark navy sidebar and branded active states.
-- Normal Settings is personal/account and role-limited; workspace-wide controls are in Owner Console.
-- `/pipelines` is the full working board. Dashboard Pipeline Overview remains a preview.
-- Owner Console Pipeline manages pipeline groups and stages. Lead stage columns can create real lead cards.
-- Branding uses workspace CSS variables for safe accent colors only; semantic success/warning/danger colors remain semantic.
-- Date picking uses the shared branded `DatePicker`/`DateTimeRangePicker` pattern instead of inconsistent native date fields.
-- Phosphor Icons are the current icon family.
+- compact dark navy sidebar
+- light workspace canvas
+- topbar inside the main content area
+- compact operational spacing
+- owner console visually distinct but still in the same design family
 
----
+### Mobile
 
-# 1. Visual Direction
+- no fixed desktop sidebar
+- compact topbar
+- bottom navigation or drawer
+- large touch targets
+- no text overlap
 
-The dashboard should feel:
+## Sidebar Direction
 
-```text
-Premium
-Clean
-Professional
-Trustworthy
-Action-first
-Modern
-Soft depth
-Rounded
-Readable
-Client-friendly
-```
+The sidebar should remain compact enough for normal operational pages to be visible without awkward scrolling on common laptop heights.
 
-The generated mockup direction remains the source of truth:
+### Current nav grouping
 
-- Dark navy sidebar
-- Light main workspace
-- Rounded white cards
-- Purple/blue accent actions
-- Soft shadows
-- KPI cards
-- Pipeline chart
-- Agenda timeline
-- Recent activity feed
-- AI assistant card
-- Simple top search
-- Workspace switcher
-- Notification icons
-- User avatar
+`Menu`
 
----
+- Overview
+- Jobs
+- Tasks
+- Calendar
+- CRM
+- Pipelines
 
-# 2. Product Identity
+`More`
 
-Use:
+- Automations
+- Reports
+- Owner Console
 
-```text
-OpsPilot
-```
+Rules:
 
-Full product:
+- `Account` should not be a primary sidebar destination
+- collapsed mode shows compact icons only
+- active state uses workspace branding when available, with a safe fallback
+- no fake count badges
+- spacing should stay compact for operational use
 
-```text
-ServiceOps Command Center
-```
+## Topbar Direction
 
-Core promise:
+- compact utility header
+- page title and subtitle aligned with the operational page template
+- business label may appear on Overview, but should stay minimal on interior pages
+- theme button available to authenticated users
+- notifications align under the bell
+- notification dropdown uses fixed max height with internal scroll
+- notification dropdown should not awkwardly blanket a whole data table
 
-```text
-Capture leads, track jobs, automate follow-ups, and see what needs attention today.
-```
+## CRM Page Direction
 
----
+The CRM module may keep the route at `/leads`, but the product language should treat it as CRM.
 
-# 3. Color Tokens
+### Tabs
 
-Add these to `src/app/globals.css`.
+- Leads
+- Contacts
 
-```css
-:root {
-  --ops-sidebar: #071327;
-  --ops-sidebar-soft: #0d1b33;
-  --ops-sidebar-card: #13223d;
+### Data model
 
-  --ops-main-bg: #f6f8fc;
-  --ops-card: #ffffff;
-  --ops-card-soft: #f8fafc;
+- leads come from `public.leads`
+- contacts come from `public.clients`
+- do not add a separate contacts table
 
-  --ops-border: #e5e9f2;
-  --ops-border-strong: #d8deea;
+### Table behavior
 
-  --ops-text: #0f172a;
-  --ops-text-soft: #475569;
-  --ops-text-muted: #94a3b8;
-  --ops-white: #ffffff;
+CRM tables should feel similar to modern high-utility sales tools:
 
-  --ops-primary: #6d5dfc;
-  --ops-primary-dark: #4f46e5;
-  --ops-primary-soft: #ede9fe;
-  --ops-primary-glow: rgba(109, 93, 252, 0.24);
+- search
+- filters
+- sort
+- row selection
+- select all
+- bulk action bar
+- manage fields
+- import
+- export
+- safe delete confirmation
 
-  --ops-success: #16a34a;
-  --ops-success-soft: #dcfce7;
+Manage Fields can remain localStorage-backed for MVP. CSV import should be server-validated.
 
-  --ops-warning: #f59e0b;
-  --ops-warning-soft: #fef3c7;
+## Pipeline UX Direction
 
-  --ops-danger: #ef4444;
-  --ops-danger-soft: #fee2e2;
+- dashboard pipeline card is preview-only
+- the full working board lives at `/pipelines`
+- pipeline groups are owner-managed
+- pipeline stages belong to groups
+- lead and job cards should be real records
+- stage columns may create real lead cards
+- drag-and-drop card movement is supported through safe server routes
+- n8n automation around movement remains future work
 
-  --ops-info: #0ea5e9;
-  --ops-info-soft: #e0f2fe;
-}
-```
+## Owner Console Direction
 
-Rule:
+Owner Console is the workspace-wide control surface.
 
-```text
-No random colors. Use tokens or Tailwind classes mapped to tokens.
-```
+Current destinations:
 
----
+- `/owner`
+- `/owner/team`
+- `/owner/invitations`
+- `/owner/branding`
+- `/owner/modules`
+- `/owner/pipeline`
+- `/owner/access-rules`
+- `/owner/audit-logs`
+- `/owner/assignments`
 
-# 4. Typography
+Owner Console controls:
 
-Recommended font:
+- branding
+- logo and icon
+- modules
+- pipeline groups and stages
+- team members
+- invitations
+- role management
+- access rules
+- audit logs
+- assignment rules
 
-```text
-Inter
-```
+Dangerous-zone operations remain future work.
 
-Use Next.js font optimization:
+## Settings Direction
 
-```text
-next/font/google
-```
+Normal Settings is a personal and role-limited page, not the workspace-wide admin hub.
 
-Fallback:
+### Current expectations
 
-```css
-Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif
-```
+- personal profile
+- security/account actions
+- personal preferences
+- limited role-aware workspace context
+- theme note or link to topbar theme control
 
----
+### Personal preferences
 
-# 5. Next.js UI Structure
+- timezone
+- date format
+- time format
+- week starts on
+- default landing page
+- table density
+- reduced motion
+- in-app notifications
 
-Use this app routing structure:
+Workspace-wide branding, modules, pipeline structure, and assignment rules belong in Owner Console.
 
-```text
-src/app/
-  layout.tsx
-  globals.css
-  (auth)/
-    login/page.tsx
-  (app)/
-    layout.tsx
-    dashboard/page.tsx
-    leads/page.tsx
-    jobs/page.tsx
-    tasks/page.tsx
-    calendar/page.tsx
-    automations/page.tsx
-    settings/page.tsx
-```
+## Branding Direction
 
-`src/app/(app)/layout.tsx` should render:
+Owner-managed branding controls:
 
-```text
-AppShell
-Sidebar
-Topbar
-Main content slot
-Mobile navigation
-```
+- app name
+- logo
+- icon
+- primary color
+- accent color
+- login heading
+- login subtext
+- workspace default theme
 
----
+Rules:
 
-# 6. App Shell
+- use workspace branding tokens safely
+- keep semantic success, warning, and danger colors semantic
+- allow preset colors plus custom HEX
 
-## Desktop
+## Theme Direction
 
-```text
-Fixed dark navy sidebar: 260px
-Light main workspace
-Topbar inside main area
-Content grid with cards
-```
+- workspace default theme is owner-managed
+- personal theme preference is user-managed
+- personal theme overrides the workspace default
+- theme controls stay visible in the topbar for authenticated roles
 
-## Mobile
+## Dashboard Direction
 
-```text
-No fixed desktop sidebar
-Compact topbar
-Bottom nav or slide drawer
-Stacked cards
-Large touch targets
-No text overlap
-```
-
----
-
-# 7. Sidebar
-
-Required sections:
-
-```text
-Logo
-Workspace switcher
-Navigation
-Upgrade/pro status card later
-User profile/sign out
-```
-
-MVP navigation:
-
-```text
-Overview
-Leads
-Jobs
-Tasks
-Calendar
-Automations
-Settings
-```
-
-Future navigation:
-
-```text
-Clients
-Invoices
-Reports
-AI Assistant
-```
-
-Active nav:
-
-- Purple gradient background
-- White text
-- Soft glow
-- Clear icon
-
-Inactive nav:
-
-- Muted text
-- Soft hover background
-- Consistent icons
-
----
-
-# 8. Topbar
-
-Include:
-
-```text
-Search anything...
-Messages icon
-Bell icon
-Theme mode
-Sign out icon
-```
-
-MVP behavior:
-
-- Search can be visual only at first
-- Icons should not fake real notifications unless data exists
-- Notifications preview real audit activity and can be marked read locally
-
----
-
-# 9. Dashboard Overview
-
-The dashboard must answer:
+Dashboard should answer:
 
 ```text
 What needs attention today?
 ```
 
-Sections:
+### Core sections
 
-1. Greeting
-2. KPI cards
-3. Pipeline Overview
-4. Today’s Agenda
-5. Tasks Overview
-6. Revenue Overview
-7. Recent Activity
-8. AI Assistant card
+- greeting and context
+- KPI cards
+- pipeline preview
+- today agenda
+- tasks overview
+- revenue overview
+- recent activity
 
-## KPI Cards
+### Metric rules
 
-Use exactly these first:
+- New Leads uses real lead rows
+- Jobs Booked uses real job rows
+- Revenue (Est.) uses `jobs.estimated_value`
+- Overdue Tasks is dynamic from `due_at` and status
+- Today agenda uses appointments and job schedules
+- Recent activity uses `audit_logs` and `automation_logs`
 
-```text
-New Leads
-Jobs Booked
-Revenue (Est.)
-Overdue Tasks
-```
+No fake KPI values.
 
-Rules:
+## Safe Delete Pattern
 
-- Use real data after DB connection
-- Use empty states before data connection
-- Do not fake production values
-- Label revenue as estimated until invoices/payments exist
+This is the global destructive-action pattern:
 
----
+- bulk action bars appear only after selection
+- select-all applies to visible filtered rows
+- delete actions use a confirmation dialog
+- the user must type exactly `Delete`
+- server routes still verify permissions and workspace scope
 
-# 10. Dashboard Components
+Apply this pattern to Leads, Contacts, Jobs, Tasks, Calendar/Appointments, and future bulk-action pages.
 
-Create these components:
+## Accessibility Rules
 
-```text
-components/dashboard/StatCard.tsx
-components/dashboard/PipelineOverview.tsx
-components/dashboard/TodayAgenda.tsx
-components/dashboard/TasksOverview.tsx
-components/dashboard/RevenueOverview.tsx
-components/dashboard/RecentActivity.tsx
-components/dashboard/AIAssistantCard.tsx
-```
+- icon-only buttons require `aria-label`
+- focus states remain visible
+- labels stay explicit on forms
+- dropdowns and dialogs remain keyboard reachable
+- compactness must not reduce legibility
 
-Use client components only when interactivity/charts need it:
+## Data Honesty Rules
 
-```tsx
-'use client'
-```
+- no fake counts
+- no fake rows
+- no fake notification totals
+- use empty states when data is missing
+- avoid placeholder badges that imply production behavior
 
-Do not mark every component as client by default.
+## Deferred UX Areas
 
----
+- invitation email delivery UX
+- full workflow builder UI
+- deeper pipeline automation surfaces
+- real-time team presence UI
+- billing UX
+- OpenAI assistant action UI
 
-# 11. UI Component System
+## Final Design Rule
 
-Create reusable components:
-
-```text
-components/ui/Button.tsx
-components/ui/Card.tsx
-components/ui/Badge.tsx
-components/ui/Input.tsx
-components/ui/Modal.tsx
-components/ui/Skeleton.tsx
-components/ui/EmptyState.tsx
-components/ui/StatusBadge.tsx
-components/ui/SectionHeader.tsx
-```
-
-Optional later:
-
-```text
-DataTable
-Drawer
-DropdownMenu
-CommandSearch
-Toast
-Tabs
-Switch
-```
-
-Recommended UI foundation:
-
-```text
-Tailwind CSS
-Phosphor Icons
-Radix UI primitives where useful
-shadcn/ui inspiration, but do not blindly install everything
-```
-
----
-
-# 12. Page Requirements
-
-## Login Page
-
-Should feel premium and trustworthy.
-
-Include:
-
-- OpsPilot logo
-- Clear sign-in form
-- Password reset link
-- Soft visual panel
-- No clutter
-
-## Dashboard Page
-
-Premium overview, not a generic admin page.
-
-## Leads Page
-
-MVP:
-
-- Search/filter row
-- Lead table or cards
-- Add Lead button
-- Empty state
-- Lead status badge
-
-Later:
-
-- Detail drawer
-- Kanban pipeline
-
-## Jobs Page
-
-MVP:
-
-- Job list
-- Schedule date
-- Status badge
-- Estimated value
-- Assigned user
-
-## Tasks Page
-
-MVP:
-
-- Task list
-- Due date
-- Priority
-- Status
-- Overdue calculated in UI/query
-
-## Calendar Page
-
-MVP:
-
-- Today/Week/Month filters
-- Appointment list
-- Job schedule list
-
-## Automations Page
-
-MVP:
-
-- Automation logs
-- Status badges
-- Placeholder for n8n connection
-
-## Settings Page
-
-Normal Settings sections:
-
-- Personal/account settings
-- Personal theme preference
-- Role-limited settings visibility
-
-Workspace-wide controls belong in Owner Console:
-
-```text
-/owner/team
-/owner/invitations
-/owner/branding
-/owner/modules
-/owner/pipeline
-/owner/access-rules
-/owner/audit-logs
-```
-
-## Pipeline Board Page
-
-`/pipelines` is the full working board.
-
-- Pipeline selector is compact and owner-defined.
-- Lead/job cards are real records only.
-- Viewer access is read-only.
-- Lead columns can show a plus icon for permitted roles to create a real lead card in that stage.
-- Owner Console remains the place to create pipeline groups and stages.
-
----
-
-# 13. Empty, Loading, and Error States
-
-Every major card/page must include:
-
-## Empty State
-
-Example:
-
-```text
-No leads yet. Add your first lead to start tracking follow-ups.
-```
-
-## Loading State
-
-Use skeletons instead of full-screen spinners where possible.
-
-## Error State
-
-Example:
-
-```text
-We couldn't load your leads. Please refresh or try again.
-```
-
-Include retry button where possible.
-
----
-
-# 14. Data Honesty Rules
-
-Do not show fake values as if they are real.
-
-Allowed:
-
-- Skeleton state
-- Empty state
-- Clearly isolated demo mode later
-
-Not allowed:
-
-- Hardcoded fake leads in production UI
-- Fake revenue values without demo mode
-- Fake notification badges unless connected to data
-
-If sample data is needed later:
-
-```env
-NEXT_PUBLIC_DEMO_MODE=true
-```
-
----
-
-# 15. Accessibility Rules
-
-- Buttons need visible labels or aria-labels
-- Icon-only buttons must have aria-label
-- Form inputs must have labels
-- Focus states must be visible
-- Do not rely only on color for status
-- Dialogs must trap/restore focus
-- Mobile targets should be comfortable
-- Tables/lists should remain readable on small screens
-
----
-
-# 16. White-Label UI Rules
-
-The UI must eventually read from:
-
-```text
-workspace_branding
-workspace_modules
-pipeline_stages
-message_templates
-custom_fields
-```
-
-Branding settings should eventually affect:
-
-- App name
-- Logo
-- Primary color
-- Accent color
-- Login heading
-- Login subtext
-- Theme mode
-
----
-
-# 17. Visual Quality Rules for Codex
-
-Codex must:
-
-1. Preserve dark navy sidebar + light main workspace.
-2. Use tokens.
-3. Keep cards rounded and clean.
-4. Avoid generic admin dashboard styling.
-5. Avoid clutter.
-6. Use clear service-business labels.
-7. Keep data states honest.
-8. Build reusable components.
-9. Make mobile usable.
-10. Avoid hardcoding one niche.
-11. Use Next.js App Router structure.
-12. Avoid unnecessary `use client`.
-
----
-
-# 18. First UI Build Order
-
-1. Global CSS tokens
-2. App shell
-3. Sidebar
-4. Topbar
-5. Reusable UI components
-6. Static dashboard shell
-7. Login page
-8. Leads page
-9. Jobs page
-10. Tasks page
-11. Settings page
-12. Real data connection
-
----
-
-# 19. Final Design Standard
-
-The finished app should feel close to:
-
-```text
-Linear
-Stripe Dashboard
-Modern CRM dashboards
-GoHighLevel-style business utility
-Premium analytics dashboards
-```
-
-But simpler and easier for non-technical business owners.
+OpsPilot should feel like a client-ready command center: compact, clear, operational, and premium without decorative clutter.

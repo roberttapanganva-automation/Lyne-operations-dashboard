@@ -1,7 +1,6 @@
 "use client";
 
 import { AddressBookIcon, XIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
@@ -10,6 +9,7 @@ import type { Client, ClientListItem } from "@/types/domain";
 type EditContactDialogProps = {
   client: ClientListItem | null;
   onClose: () => void;
+  onContactUpdated?: (client: ClientListItem) => void;
   open: boolean;
 };
 
@@ -24,9 +24,9 @@ function getErrorMessage(response: ApiResponse<Client>) {
 export function EditContactDialog({
   client,
   onClose,
+  onContactUpdated,
   open,
 }: EditContactDialogProps) {
-  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,10 +82,19 @@ export function EditContactDialog({
         notify.error("Contact could not be updated", errorMessage);
         return;
       }
+      if (!result.ok) {
+        const errorMessage = "We could not update the contact. Please try again.";
+        setError(errorMessage);
+        notify.error("Contact could not be updated", errorMessage);
+        return;
+      }
 
+      onContactUpdated?.({
+        ...client,
+        ...result.data,
+      });
       onClose();
       notify.success("Contact updated", "The contact details were saved.");
-      router.refresh();
     } catch (caughtError) {
       const errorMessage =
         caughtError instanceof Error

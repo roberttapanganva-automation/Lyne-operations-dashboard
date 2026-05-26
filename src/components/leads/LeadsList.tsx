@@ -10,15 +10,20 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { AssignmentSelect } from "@/components/assignments/AssignmentSelect";
 import { Card } from "@/components/ui/Card";
 import { BulkActionBar } from "@/components/ui/BulkActionBar";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { DateTimeCell, DateTimeHeader } from "@/components/ui/DateTimeCell";
-import { downloadCsv } from "@/lib/csv/client";
+import { downloadCsv, getDatedCsvFilename } from "@/lib/csv/client";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { LeadPipelineStageOption } from "@/lib/pipelines/queries";
-import type { Client, ClientSummary } from "@/types/domain";
+import type {
+  AssignableWorkspaceMember,
+  Client,
+  ClientSummary,
+} from "@/types/domain";
 import {
   LeadsAdvancedFiltersDialog,
   type LeadAdvancedFilters,
@@ -33,6 +38,8 @@ import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ManageFieldsDialog, type FieldOption } from "./ManageFieldsDialog";
 
 export type LeadListItem = {
+  assigned_member: AssignableWorkspaceMember | null;
+  assigned_member_id: string | null;
   client: ClientSummary | null;
   client_id: string | null;
   created_at: string;
@@ -46,7 +53,14 @@ export type LeadListItem = {
   title: string;
 };
 
-type LeadView = "all" | "open" | "won" | "lost" | "follow_up_due";
+type LeadView =
+  | "all"
+  | "assigned_to_me"
+  | "follow_up_due"
+  | "lost"
+  | "open"
+  | "unassigned"
+  | "won";
 type LeadSort =
   | "newest"
   | "oldest"
@@ -55,9 +69,11 @@ type LeadSort =
 
 type LeadsListProps = {
   activeTab: "leads" | "contacts";
+  canAssignRecords: boolean;
   canCreateRecords: boolean;
   canDeleteRecords: boolean;
   clients: Client[];
+  currentMemberId: string | null;
   leads: LeadListItem[];
   stageOptions: LeadPipelineStageOption[];
 };
@@ -213,13 +229,16 @@ function getInitialVisibleFields() {
 
 export function LeadsList({
   activeTab,
+  canAssignRecords,
   canCreateRecords,
   canDeleteRecords,
   clients,
+  currentMemberId,
   leads,
   stageOptions,
 }: LeadsListProps) {
   const router = useRouter();
+  const [localLeads, setLocalLeads] = useState(leads);
   const [activeView, setActiveView] = useState<LeadView>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
@@ -263,19 +282,24 @@ export function LeadsList({
 
   const viewCounts = useMemo(
     () => ({
-      all: leads.length,
-      follow_up_due: leads.filter(isFollowUpDue).length,
-      lost: leads.filter((lead) => lead.status === "lost").length,
-      open: leads.filter((lead) => lead.status === "open").length,
-      won: leads.filter((lead) => lead.status === "won").length,
+      all: localLeads.length,
+      assigned_to_me: currentMemberId
+        ? localLeads.filter((lead) => lead.assigned_member_id === currentMemberId)
+            .length
+        : 0,
+      follow_up_due: localLeads.filter(isFollowUpDue).length,
+      lost: localLeads.filter((lead) => lead.status === "lost").length,
+      open: localLeads.filter((lead) => lead.status === "open").length,
+      unassigned: localLeads.filter((lead) => !lead.assigned_member_id).length,
+      won: localLeads.filter((lead) => lead.status === "won").length,
     }),
-    [leads],
+    [currentMemberId, localLeads],
   );
 
   const filteredLeads = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    let nextLeads = leads.filter((lead) => {
+    let nextLeads = localLeads.filter((lead) => {
       if (activeView === "open" && lead.status !== "open") {
         return false;
       }
@@ -289,6 +313,17 @@ export function LeadsList({
       }
 
       if (activeView === "follow_up_due" && !isFollowUpDue(lead)) {
+        return false;
+      }
+
+      if (
+        activeView === "assigned_to_me" &&
+        (!currentMemberId || lead.assigned_member_id !== currentMemberId)
+      ) {
+        return false;
+      }
+
+      if (activeView === "unassigned" && lead.assigned_member_id) {
         return false;
       }
 
@@ -429,7 +464,8 @@ export function LeadsList({
   }, [
     activeView,
     advancedFilters,
-    leads,
+    currentMemberId,
+    localLeads,
     priorityFilter,
     searchQuery,
     sortBy,
@@ -440,6 +476,9 @@ export function LeadsList({
   const allFilteredSelected =
     filteredLeads.length > 0 &&
     filteredLeads.every((lead) => selectedIds.includes(lead.id));
+  const visibleSelectedIds = selectedIds.filter((selectedId) =>
+    filteredLeads.some((lead) => lead.id === selectedId),
+  );
 
   function toggleSelectAll() {
     if (allFilteredSelected) {
@@ -494,7 +533,7 @@ export function LeadsList({
       const response = await fetch("/api/leads/bulk", {
         body: JSON.stringify({
           action: "delete",
-          ids: selectedIds,
+          ids: visibleSelectedIds,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -519,9 +558,12 @@ export function LeadsList({
           ? "The selected lead was removed."
           : "The selected leads were removed.",
       );
+      const deletedIds = new Set(visibleSelectedIds);
+      setLocalLeads((current) =>
+        current.filter((lead) => !deletedIds.has(lead.id)),
+      );
       clearSelection();
       setBulkDeleteOpen(false);
-      router.refresh();
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -536,7 +578,7 @@ export function LeadsList({
 
   function exportVisibleLeads() {
     downloadCsv({
-      filename: "opspilot-leads.csv",
+      filename: getDatedCsvFilename("opspilot-leads"),
       headers: [
         "title",
         "contact",
@@ -568,11 +610,26 @@ export function LeadsList({
     });
   }
 
-  if (leads.length === 0) {
+  function handleLeadCreated(lead: LeadListItem) {
+    setLocalLeads((current) => [lead, ...current]);
+  }
+
+  function handleLeadUpdated(lead: LeadListItem) {
+    setLocalLeads((current) =>
+      current.map((currentLead) =>
+        currentLead.id === lead.id ? lead : currentLead,
+      ),
+    );
+    setEditingLead((current) => (current?.id === lead.id ? lead : current));
+  }
+
+  if (localLeads.length === 0) {
     return (
       <LeadsEmptyState
+        canAssignRecords={canAssignRecords}
         canCreateRecords={canCreateRecords}
         clients={clients}
+        onLeadCreated={handleLeadCreated}
         stageOptions={stageOptions}
       />
     );
@@ -582,6 +639,12 @@ export function LeadsList({
   const fieldVisible = (fieldId: string) => visibleFields.includes(fieldId);
   const viewOptions: Array<{ key: LeadView; label: string; count: number }> = [
     { key: "all", label: "All", count: viewCounts.all },
+    {
+      key: "assigned_to_me",
+      label: "Assigned to me",
+      count: viewCounts.assigned_to_me,
+    },
+    { key: "unassigned", label: "Unassigned", count: viewCounts.unassigned },
     { key: "open", label: "Open", count: viewCounts.open },
     { key: "won", label: "Won", count: viewCounts.won },
     { key: "lost", label: "Lost", count: viewCounts.lost },
@@ -629,7 +692,7 @@ export function LeadsList({
                 </Link>
               </div>
               <span className="inline-flex items-center rounded-full bg-[var(--ops-card-soft)] px-3 py-1 text-sm font-semibold text-[var(--ops-text-soft)]">
-                {leads.length} {leads.length === 1 ? "Lead" : "Leads"}
+                {localLeads.length} {localLeads.length === 1 ? "Lead" : "Leads"}
               </span>
             </div>
           </div>
@@ -646,8 +709,10 @@ export function LeadsList({
             ) : null}
             {canCreateRecords ? (
               <AddLeadDialog
+                canAssignRecords={canAssignRecords}
                 className="h-9"
                 clients={clients}
+                onLeadCreated={handleLeadCreated}
                 stageOptions={stageOptions}
                 variant="primary"
               />
@@ -826,7 +891,7 @@ export function LeadsList({
             entityLabel="lead"
             onClearSelection={clearSelection}
             onDelete={() => setBulkDeleteOpen(true)}
-            selectedCount={selectedIds.length}
+            selectedCount={visibleSelectedIds.length}
           />
           {bulkDeleteError ? (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--ops-danger)]">
@@ -836,7 +901,7 @@ export function LeadsList({
         </div>
       </div>
 
-      <Card className="overflow-hidden">
+        <Card className="ops-density-surface overflow-hidden">
         {filteredLeads.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-[var(--ops-text-soft)] sm:px-6">
             No leads match the current view.
@@ -858,6 +923,9 @@ export function LeadsList({
                     </th>
                     <th className="px-5 py-3 sm:px-6" scope="col">
                       Lead name
+                    </th>
+                    <th className="px-5 py-3" scope="col">
+                      Assigned to
                     </th>
                     {fieldVisible("status") ? (
                       <th className="px-5 py-3" scope="col">
@@ -937,6 +1005,15 @@ export function LeadsList({
                           </div>
                         </div>
                       </td>
+                      <td className="px-5 py-4">
+                        <AssignmentSelect
+                          assignedMember={lead.assigned_member}
+                          assignedMemberId={lead.assigned_member_id}
+                          canAssign={canAssignRecords}
+                          recordId={lead.id}
+                          targetType="lead"
+                        />
+                      </td>
                       {fieldVisible("status") ? (
                         <td className="px-5 py-4">
                           <LeadStatusBadge status={lead.status} />
@@ -983,7 +1060,7 @@ export function LeadsList({
             <div className="divide-y divide-[var(--ops-border)] lg:hidden">
               {filteredLeads.map((lead) => (
                 <article
-                  className={`space-y-4 p-5 ${canCreateRecords ? "cursor-pointer transition hover:bg-[var(--ops-card-soft)]" : ""}`}
+                  className={`ops-density-card space-y-4 p-5 ${canCreateRecords ? "cursor-pointer transition hover:bg-[var(--ops-card-soft)]" : ""}`}
                   key={lead.id}
                   onDoubleClick={() => openLeadEditor(lead)}
                   title={canCreateRecords ? "Double-click to edit lead" : undefined}
@@ -1025,6 +1102,21 @@ export function LeadsList({
                   <div className="flex flex-wrap items-center gap-2">
                     <LeadStatusBadge status={lead.status} />
                     <LeadPriorityBadge priority={lead.priority} />
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
+                      Assigned to
+                    </p>
+                    <div className="mt-2">
+                      <AssignmentSelect
+                        assignedMember={lead.assigned_member}
+                        assignedMemberId={lead.assigned_member_id}
+                        canAssign={canAssignRecords}
+                        recordId={lead.id}
+                        targetType="lead"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid gap-3 text-sm sm:grid-cols-2">
@@ -1080,23 +1172,25 @@ export function LeadsList({
       <ConfirmDeleteDialog
         confirmLabel="Delete leads"
         isSubmitting={isBulkDeleting}
-        itemCount={selectedIds.length}
+        itemCount={visibleSelectedIds.length}
         onCancel={() => {
           if (!isBulkDeleting) {
             setBulkDeleteOpen(false);
           }
         }}
         onConfirm={deleteSelectedLeads}
-        open={bulkDeleteOpen}
+        open={bulkDeleteOpen && visibleSelectedIds.length > 0}
         title="Delete selected leads?"
       />
       {editingLead ? (
-        <EditLeadDialog
-          hideTrigger
-          lead={editingLead}
-          onOpenChange={(open) => {
-            if (!open) {
-              setEditingLead(null);
+      <EditLeadDialog
+        canAssignRecords={canAssignRecords}
+        hideTrigger
+        lead={editingLead}
+        onLeadUpdated={handleLeadUpdated}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingLead(null);
             }
           }}
           open

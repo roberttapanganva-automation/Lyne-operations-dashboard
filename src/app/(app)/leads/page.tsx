@@ -1,8 +1,10 @@
 import { getClientsForActiveWorkspace } from "@/lib/clients/queries";
 import { getLeadsForActiveWorkspace } from "@/lib/leads/queries";
 import { getLeadPipelineStageOptionsForActiveWorkspace } from "@/lib/pipelines/queries";
+import { getCurrentWorkspaceMemberId } from "@/lib/assignments/queries";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
 import {
+  canAssignOperationalRecords,
   canCreateOperationalRecords,
   canDeleteOperationalRecords,
 } from "@/lib/permissions/workspace";
@@ -25,10 +27,11 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   const activeTab = tabParam === "contacts" ? "contacts" : "leads";
   const activeWorkspace = await getActiveWorkspace();
   const supabase = await createClient();
-  const [leads, clients, stageOptions] = await Promise.all([
+  const [leads, clients, stageOptions, currentMemberId] = await Promise.all([
     getLeadsForActiveWorkspace(),
     getClientsForActiveWorkspace(),
     getLeadPipelineStageOptionsForActiveWorkspace(),
+    getCurrentWorkspaceMemberId(),
   ]);
   const rolePermission =
     activeWorkspace.status === "ready"
@@ -45,6 +48,9 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   const canDeleteRecords =
     activeWorkspace.status === "ready" &&
     canDeleteOperationalRecords(activeWorkspace.context.role);
+  const canAssignRecords =
+    activeWorkspace.status === "ready" &&
+    canAssignOperationalRecords(activeWorkspace.context.role);
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -52,9 +58,11 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
         <>
           <LeadsList
             activeTab={activeTab}
+            canAssignRecords={canAssignRecords}
             canCreateRecords={canCreateRecords}
             canDeleteRecords={canDeleteRecords}
             clients={clients}
+            currentMemberId={currentMemberId}
             leads={leads}
             stageOptions={stageOptions}
           />

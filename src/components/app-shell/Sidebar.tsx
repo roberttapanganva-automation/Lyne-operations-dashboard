@@ -1,7 +1,6 @@
 "use client";
 
 import { use } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CaretLeftIcon,
@@ -14,10 +13,11 @@ import {
   getWorkspaceLogoUrl,
 } from "@/lib/branding/display";
 import type { ActiveWorkspaceContext } from "@/types/domain";
-import type { CurrentAccountSummary } from "@/lib/account/queries";
-import { getVisibleNavItems } from "./nav-items";
+import { getSidebarNavGroups, getUtilityNavItems } from "./nav-items";
+import { SmartNavLink } from "./SmartNavLink";
 import { UserMenu } from "./UserMenu";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import type { CurrentAccountSummary } from "@/lib/account/queries";
 
 type SidebarProps = {
   collapsed: boolean;
@@ -47,130 +47,235 @@ export function Sidebar({
       branding: workspaceContext.branding,
       workspaceName: workspaceContext.workspace.name,
     }) ?? collapsedAssetUrl;
-  const visibleNavItems = getVisibleNavItems(workspaceContext);
+  const navGroups = getSidebarNavGroups(workspaceContext);
+  const utilityItems = getUtilityNavItems(workspaceContext);
   const ToggleIcon = collapsed ? CaretRightIcon : CaretLeftIcon;
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 hidden shrink-0 bg-[var(--ops-sidebar)] px-5 py-6 text-[var(--ops-white)] transition-[width] duration-300 ease-out lg:flex lg:flex-col ${
-        collapsed ? "w-[84px]" : "w-[260px]"
+      className={`fixed inset-y-0 left-0 hidden shrink-0 overflow-hidden border-r border-white/5 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_28%),linear-gradient(180deg,#071327_0%,#091a31_100%)] text-[var(--ops-white)] transition-[width] duration-300 ease-out lg:flex lg:flex-col ${
+        collapsed ? "w-[78px]" : "w-[264px]"
       }`}
     >
-      <Link
-        className={`flex items-center gap-3 ${collapsed ? "justify-center" : ""} min-w-0`}
-        href="/dashboard"
+      <div
+        className={`relative flex h-full min-h-0 flex-col overflow-hidden ${
+          collapsed ? "px-2 py-3" : "px-3 py-3"
+        }`}
       >
-        {collapsed ? (
-          <span aria-label={appName} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden" title={appName}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt={`${appName} icon`}
-              className="h-full w-full object-contain"
-              src={collapsedAssetUrl}
-            />
-          </span>
-        ) : (
-          <span className="min-w-0 flex-1">
-            <span className="flex min-h-[48px] w-full items-center justify-center overflow-hidden px-1 py-0.5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt={`${appName} logo`}
-                className="max-h-12 w-auto max-w-full object-contain object-center"
-                src={expandedAssetUrl}
-              />
-            </span>
-            <span className="mt-1 block text-center text-xs text-white/55">
-              Command Center
-            </span>
-          </span>
-        )}
-      </Link>
-
-      {!collapsed && workspaceContext.role === "owner" ? (
-        <WorkspaceSwitcher workspaceContext={workspaceContext} />
-      ) : null}
-
-      <nav
-        className={`flex flex-1 flex-col gap-1 ${collapsed ? "mt-6" : "mt-5"}`}
-        aria-label="Main"
-      >
-        {collapsed ? (
-          <button
-            aria-label="Search anything"
-            className="mb-2 inline-flex h-10 w-full items-center justify-center rounded-lg border border-white/10 bg-white/8 text-white/75 transition hover:bg-white/12 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
-            type="button"
+        <div className={`${collapsed ? "" : "px-1"} shrink-0`}>
+          <div
+            className={`relative ${collapsed ? "flex min-h-[52px] items-start justify-center pt-1" : "min-h-[76px] pt-1"}`}
           >
-            <MagnifyingGlassIcon aria-hidden="true" size={18} weight="regular" />
-          </button>
-        ) : (
-          <div className="mb-2 px-0">
-            <label className="sr-only" htmlFor="global-search">
-              Search anything
-            </label>
-            <div className="relative">
-              <MagnifyingGlassIcon
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/45"
-                size={17}
-                weight="regular"
-              />
-              <input
-                className="h-9 w-full rounded-lg border border-white/10 bg-white/8 px-3 pl-9 text-sm text-white outline-none transition placeholder:text-white/45 hover:bg-white/10 focus:border-[var(--ops-primary)] focus:ring-2 focus:ring-[var(--ops-primary-glow)]"
-                id="global-search"
-                placeholder="Search..."
-                type="search"
-              />
-            </div>
-          </div>
-        )}
-        {visibleNavItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.Icon;
-
-          return (
-            <Link
-              aria-current={isActive ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition ${
-                isActive
-                  ? "bg-[linear-gradient(135deg,var(--ops-primary),var(--ops-primary-dark))] text-[var(--ops-white)] shadow-[0_12px_28px_var(--ops-primary-glow)]"
-                  : "text-white/70 hover:bg-white/10 hover:text-[var(--ops-white)]"
-              } ${collapsed ? "justify-center px-2" : "px-3"}`}
-              href={item.href}
-              key={item.href}
-              title={collapsed ? item.label : undefined}
+            <SmartNavLink
+              className={`min-w-0 ${collapsed ? "mx-auto pt-0.5" : "block w-full pt-0.5"}`}
+              href="/dashboard"
+              title={collapsed ? appName : undefined}
             >
-              <Icon aria-hidden="true" size={20} weight="duotone" />
-              <span className={collapsed ? "sr-only" : ""}>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+              {collapsed ? (
+                <span
+                  aria-label={appName}
+                  className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/[0.06] ring-1 ring-white/10"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt={`${appName} icon`}
+                    className="h-6 w-6 object-contain"
+                    src={collapsedAssetUrl}
+                  />
+                </span>
+              ) : (
+                <span className="block min-w-0 text-center">
+                  <span className="flex min-h-[34px] items-center justify-center overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt={`${appName} logo`}
+                      className="max-h-8 w-auto max-w-full object-contain object-center"
+                      src={expandedAssetUrl}
+                    />
+                  </span>
+                  <span className="mt-1 block text-[11px] leading-4 text-white/55">
+                    Command Center
+                  </span>
+                </span>
+              )}
+            </SmartNavLink>
+          </div>
+        </div>
 
-      {collapsed ? (
-        <div className="mt-4 flex flex-col items-center gap-3">
-          <UserMenu account={account} compact />
+        {!collapsed ? (
+          <div className="mt-2 shrink-0">
+            <WorkspaceSwitcher
+              canSwitch={workspaceContext.role === "owner"}
+              collapsed={collapsed}
+              workspaceContext={workspaceContext}
+            />
+          </div>
+        ) : null}
+
+        <div className={`${collapsed ? "mt-2" : "mt-2.5"} shrink-0`}>
           <button
-            aria-label={collapsed ? "Open sidebar" : "Close sidebar"}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/25 bg-[var(--ops-primary)] text-white shadow-[0_10px_24px_var(--ops-primary-glow)] transition hover:bg-[var(--ops-primary-dark)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
-            onClick={onToggleCollapsed}
+            aria-label={collapsed ? "Expand sidebar search" : "Search anything"}
+            className={`inline-flex h-8 w-full items-center rounded-xl border border-white/10 bg-white/[0.04] text-white/58 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)] ${
+              collapsed ? "justify-center" : "justify-start px-2.5"
+            }`}
+            onClick={() => {
+              if (collapsed) {
+                onToggleCollapsed();
+              }
+            }}
             type="button"
           >
-            <ToggleIcon aria-hidden="true" size={20} weight="regular" />
+            <MagnifyingGlassIcon aria-hidden="true" size={15} weight="regular" />
+            {!collapsed ? (
+              <span className="ml-2 flex-1 text-left text-[13px] font-medium">
+                Search anything
+              </span>
+            ) : null}
           </button>
         </div>
-      ) : (
-        <div className="relative mt-2">
-          <UserMenu account={account} />
-          <button
-            aria-label={collapsed ? "Open sidebar" : "Close sidebar"}
-            className="absolute right-[-14px] top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-[var(--ops-primary)] text-white shadow-[0_10px_24px_var(--ops-primary-glow)] transition hover:bg-[var(--ops-primary-dark)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
-            onClick={onToggleCollapsed}
-            type="button"
+
+        <div className="mt-2.5 min-h-0 flex-1 overflow-hidden">
+          <nav
+            aria-label="Primary"
+            className={`flex h-full min-h-0 flex-col overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+              collapsed ? "gap-2" : "gap-2.5"
+            }`}
           >
-            <ToggleIcon aria-hidden="true" size={20} weight="regular" />
-          </button>
+            {navGroups.map((group) => (
+              <div key={group.label}>
+                {!collapsed ? (
+                  <p className="mb-1 px-2 text-[9px] font-semibold uppercase tracking-[0.22em] text-white/32">
+                    {group.label}
+                  </p>
+                ) : null}
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const isActive =
+                      pathname === item.href ||
+                      pathname.startsWith(`${item.href}/`);
+                    const Icon = item.Icon;
+
+                    return (
+                      <SmartNavLink
+                        aria-current={isActive ? "page" : undefined}
+                        aria-label={collapsed ? item.label : undefined}
+                        className={`group flex items-center gap-2 rounded-lg text-[13px] font-medium transition ${
+                          isActive
+                            ? "bg-[linear-gradient(135deg,var(--workspace-primary,var(--ops-primary)),var(--ops-primary-dark))] text-white shadow-[0_10px_22px_var(--workspace-primary-glow,var(--ops-primary-glow))]"
+                            : "text-white/66 hover:bg-white/[0.06] hover:text-white"
+                        } ${collapsed ? "h-[34px] justify-center px-1.5" : "h-[34px] px-2"}`}
+                        href={item.href}
+                        key={item.href}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <span
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition ${
+                            isActive
+                              ? "bg-white/14 text-white"
+                              : "text-white/72 group-hover:bg-white/[0.08] group-hover:text-white"
+                          }`}
+                        >
+                          <Icon
+                            aria-hidden="true"
+                            size={16}
+                            weight={isActive ? "duotone" : "regular"}
+                          />
+                        </span>
+                        {!collapsed ? (
+                          <span className="min-w-0 flex-1 truncate">
+                            {item.label}
+                          </span>
+                        ) : (
+                          <span className="sr-only">{item.label}</span>
+                        )}
+                      </SmartNavLink>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {utilityItems.length > 0 ? (
+              <div className={`${collapsed ? "pt-1" : "pt-1.5"}`}>
+                {!collapsed ? (
+                  <p className="mb-1 px-2 text-[9px] font-semibold uppercase tracking-[0.22em] text-white/32">
+                    Settings
+                  </p>
+                ) : null}
+                <div className="space-y-0.5">
+                  {utilityItems.map((item) => {
+                    const isActive =
+                      pathname === item.href ||
+                      pathname.startsWith(`${item.href}/`);
+                    const Icon = item.Icon;
+
+                    return (
+                      <SmartNavLink
+                        aria-current={isActive ? "page" : undefined}
+                        aria-label={collapsed ? item.label : undefined}
+                        className={`group flex items-center gap-2 rounded-lg text-[13px] font-medium transition ${
+                          isActive
+                            ? "bg-white/[0.08] text-white"
+                            : "text-white/58 hover:bg-white/[0.05] hover:text-white"
+                        } ${collapsed ? "h-[34px] justify-center px-1.5" : "h-[34px] px-2"}`}
+                        href={item.href}
+                        key={item.href}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/72 transition group-hover:bg-white/[0.08] group-hover:text-white">
+                          <Icon
+                            aria-hidden="true"
+                            size={16}
+                            weight={isActive ? "duotone" : "regular"}
+                          />
+                        </span>
+                        {!collapsed ? (
+                          <span className="truncate">{item.label}</span>
+                        ) : null}
+                      </SmartNavLink>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </nav>
         </div>
-      )}
+
+        <div
+          className={`mt-3 shrink-0 border-t border-white/8 ${
+            collapsed ? "pt-2" : "pt-2.5"
+          }`}
+        >
+          {collapsed ? (
+            <div className="flex justify-center px-1 py-1">
+              <button
+                aria-expanded={!collapsed}
+                aria-label="Expand sidebar"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[linear-gradient(135deg,var(--workspace-primary,var(--ops-primary)),var(--ops-primary-dark))] text-white transition hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+                onClick={onToggleCollapsed}
+                type="button"
+              >
+                <ToggleIcon aria-hidden="true" size={14} weight="bold" />
+              </button>
+            </div>
+          ) : (
+            <UserMenu
+              accessory={
+                <button
+                  aria-expanded={!collapsed}
+                  aria-label="Collapse sidebar"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[linear-gradient(135deg,var(--workspace-primary,var(--ops-primary)),var(--ops-primary-dark))] text-white transition hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+                  onClick={onToggleCollapsed}
+                  type="button"
+                >
+                  <ToggleIcon aria-hidden="true" size={14} weight="bold" />
+                </button>
+              }
+              account={account}
+            />
+          )}
+        </div>
+      </div>
     </aside>
   );
 }

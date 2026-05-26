@@ -1,15 +1,15 @@
 "use client";
 
 import { AddressBookIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
-import type { Client } from "@/types/domain";
+import type { Client, ClientListItem } from "@/types/domain";
 
 type AddContactDialogProps = {
   className?: string;
+  onContactCreated?: (client: ClientListItem) => void;
 };
 
 function getErrorMessage(response: ApiResponse<Client>) {
@@ -20,8 +20,22 @@ function getErrorMessage(response: ApiResponse<Client>) {
   return response.error.message;
 }
 
-export function AddContactDialog({ className = "" }: AddContactDialogProps) {
-  const router = useRouter();
+function toNewClientListItem(client: Client): ClientListItem {
+  return {
+    ...client,
+    completed_job_count: 0,
+    last_activity_at: null,
+    latest_completed_job_at: null,
+    latest_lead_activity_at: null,
+    linked_lead_count: 0,
+    relationship_label: "Saved contact",
+  };
+}
+
+export function AddContactDialog({
+  className = "",
+  onContactCreated,
+}: AddContactDialogProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,11 +84,17 @@ export function AddContactDialog({ className = "" }: AddContactDialogProps) {
         notify.error("Contact could not be added", errorMessage);
         return;
       }
+      if (!result.ok) {
+        const errorMessage = "We could not create the contact. Please try again.";
+        setError(errorMessage);
+        notify.error("Contact could not be added", errorMessage);
+        return;
+      }
 
       formRef.current?.reset();
       setIsOpen(false);
+      onContactCreated?.(toNewClientListItem(result.data));
       notify.success("Contact added", "The contact was saved to your workspace.");
-      router.refresh();
     } catch (caughtError) {
       const errorMessage =
         caughtError instanceof Error
@@ -246,7 +266,7 @@ export function AddContactDialog({ className = "" }: AddContactDialogProps) {
                   Cancel
                 </Button>
                 <Button disabled={isSubmitting} type="submit">
-                  {isSubmitting ? "Saving..." : "Save contact"}
+                  {isSubmitting ? "Adding..." : "Add contact"}
                 </Button>
               </div>
             </form>

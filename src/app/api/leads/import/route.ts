@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateLeadPages } from "@/lib/cache/revalidate-app";
 import { ZodError } from "zod";
 import { createOrReuseClientInWorkspace } from "@/lib/clients/mutations";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
@@ -196,6 +197,10 @@ export async function POST(request: Request) {
           status: "error",
         });
       }
+    }
+
+    if (created > 0) {
+      revalidateLeadPages();
     }
 
     return jsonResponse({

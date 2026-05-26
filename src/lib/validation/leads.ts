@@ -34,7 +34,14 @@ const optionalDateTime = z.preprocess((value) => {
   return value;
 }, z.string().refine((value) => !Number.isNaN(Date.parse(value)), "Enter a valid follow-up date.").optional());
 
+const optionalNullableUuid = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? null : value,
+  z.uuid().nullable().optional(),
+);
+
 export const createLeadSchema = z.object({
+  assigned_member_id: optionalNullableUuid,
   client_id: z.uuid().optional(),
   client_email: optionalEmail,
   client_name: optionalText,
@@ -50,6 +57,7 @@ export const createLeadSchema = z.object({
 });
 
 export const updateLeadSchema = z.object({
+  assigned_member_id: optionalNullableUuid,
   estimated_value: optionalNumber.default(0),
   next_follow_up_at: optionalDateTime,
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),

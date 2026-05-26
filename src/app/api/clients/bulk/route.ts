@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateClientPages } from "@/lib/cache/revalidate-app";
 import { ZodError } from "zod";
 import { canDeleteOperationalRecords } from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
@@ -177,7 +178,7 @@ export async function POST(request: Request) {
           error: {
             code: "CLIENT_HAS_LINKED_RECORDS",
             message:
-              "This contact is linked to existing leads or jobs. Remove or reassign those records before deleting.",
+              "One or more selected contacts are linked to existing leads, jobs, or appointments. Remove or reassign those records before deleting.",
           },
           ok: false,
         },
@@ -222,6 +223,8 @@ export async function POST(request: Request) {
           workspace_id: workspaceId,
         })),
       );
+
+      revalidateClientPages();
     }
 
     return jsonResponse({

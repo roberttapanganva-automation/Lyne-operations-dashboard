@@ -1,8 +1,10 @@
 "use client";
 
-import { PlusCircleIcon, TrashIcon } from "@phosphor-icons/react";
+import { PlusCircleIcon } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { BulkActionBar } from "@/components/ui/BulkActionBar";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { DateTimeCell, DateTimeHeader } from "@/components/ui/DateTimeCell";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
@@ -62,6 +64,7 @@ export function CalendarList({
   const router = useRouter();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingAppointment, setEditingAppointment] =
@@ -130,6 +133,8 @@ export function CalendarList({
       }
 
       setSelectedIds([]);
+      setSelectionMode(false);
+      setBulkDeleteOpen(false);
       notify.success("Deleted successfully");
       router.refresh();
     } catch (caughtError) {
@@ -146,48 +151,49 @@ export function CalendarList({
 
   return (
     <>
-      <div className="flex flex-col gap-4 border-b border-[var(--ops-border)] px-5 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-base font-semibold text-[var(--ops-text)]">
-          Appointment list
-        </h2>
-        {canDeleteRecords ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--ops-border)] bg-white px-3 text-sm font-semibold text-[var(--ops-text-soft)] shadow-sm transition hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
-              onClick={toggleSelectionMode}
-              type="button"
-            >
-              <PlusCircleIcon aria-hidden="true" size={18} weight="regular" />
-              {selectionMode ? "Cancel selection" : "Select"}
-            </button>
-            {selectionMode ? (
-              <>
+      <div className="space-y-3 border-b border-[var(--ops-border)] px-5 py-4 sm:px-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <h2 className="text-base font-semibold text-[var(--ops-text)]">
+            Appointment list
+          </h2>
+          {canDeleteRecords ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--ops-border)] bg-white px-3 text-sm font-semibold text-[var(--ops-text-soft)] shadow-sm transition hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+                onClick={toggleSelectionMode}
+                type="button"
+              >
+                <PlusCircleIcon aria-hidden="true" size={18} weight="regular" />
+                {selectionMode ? "Cancel selection" : "Select"}
+              </button>
+              {selectionMode ? (
                 <button
                   className="inline-flex h-9 items-center rounded-lg border border-[var(--ops-border)] bg-white px-3 text-sm font-semibold text-[var(--ops-text-soft)] shadow-sm transition hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
                   onClick={toggleAllAppointments}
                   type="button"
                 >
                   {selectedIds.length === appointments.length
-                    ? "Clear all"
+                    ? "Clear visible"
                     : "Select visible"}
                 </button>
-                <button
-                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 text-sm font-semibold text-[var(--ops-danger)] shadow-sm transition hover:border-red-200 hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={selectedIds.length === 0 || isDeleting}
-                  onClick={deleteSelectedAppointments}
-                  type="button"
-                >
-                  <TrashIcon aria-hidden="true" size={18} weight="regular" />
-                  {isDeleting
-                    ? "Deleting..."
-                    : `Delete selected (${selectedIds.length})`}
-                </button>
-              </>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        {canDeleteRecords && selectionMode && selectedIds.length > 0 ? (
+          <BulkActionBar
+            canDelete
+            canEdit={false}
+            entityLabel="appointment"
+            onClearSelection={() => setSelectedIds([])}
+            onDelete={() => setBulkDeleteOpen(true)}
+            selectedCount={selectedIds.length}
+          />
         ) : null}
         {error ? (
-          <p className="text-sm text-[var(--ops-danger)]">{error}</p>
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--ops-danger)]">
+            {error}
+          </p>
         ) : null}
       </div>
 
@@ -382,6 +388,22 @@ export function CalendarList({
           open
         />
       ) : null}
+      <ConfirmDeleteDialog
+        confirmLabel={
+          selectedIds.length === 1 ? "Delete appointment" : "Delete appointments"
+        }
+        description="This will permanently remove the selected appointment records from this workspace. Use this only for cancelled, duplicate, or incorrectly added appointments."
+        isSubmitting={isDeleting}
+        itemCount={selectedIds.length}
+        onCancel={() => {
+          if (!isDeleting) {
+            setBulkDeleteOpen(false);
+          }
+        }}
+        onConfirm={deleteSelectedAppointments}
+        open={bulkDeleteOpen && selectedIds.length > 0}
+        title="Delete selected appointments?"
+      />
     </>
   );
 }

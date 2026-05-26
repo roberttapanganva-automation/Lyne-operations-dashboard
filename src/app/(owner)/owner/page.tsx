@@ -95,8 +95,7 @@ export default async function OwnerOverviewPage() {
           Workspace ownership controls
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--ops-text-soft)]">
-          Manage team roles, pending invites, workspace controls, access rules,
-          and audit visibility for {overview.workspace.name}.
+          Control workspace branding, roles, permissions, modules, and business-level configuration.
         </p>
       </section>
 
