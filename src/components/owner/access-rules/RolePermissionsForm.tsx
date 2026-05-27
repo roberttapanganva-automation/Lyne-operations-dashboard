@@ -18,6 +18,7 @@ const permissionFields = [
   ["can_create_jobs", "Create jobs"],
   ["can_create_tasks", "Create tasks"],
   ["can_create_appointments", "Create appointments"],
+  ["can_view_automations", "View automations"],
   ["can_view_audit_logs", "View audit logs"],
 ] as const;
 

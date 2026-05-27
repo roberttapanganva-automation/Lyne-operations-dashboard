@@ -13,6 +13,8 @@
 - Owner Console
 - Assignment foundation
 - n8n event bridge with safe failure handling
+- Workspace API access keys for external automation builders
+- inbound lead capture using workspace API keys
 
 ## Implemented Backend Features
 
@@ -29,6 +31,7 @@
 - assignment fields on leads, jobs, and tasks
 - `workspace-branding` and `user-avatars` storage buckets
 - `automation_logs` for n8n event outcomes
+- workspace API key metadata and hashed secrets
 
 ## Current Role Model
 
@@ -68,3 +71,5 @@
 3. notification dropdown polish and unread-state UX review
 4. pipeline automation follow-up around n8n events
 5. production readiness pass for deployment, logging, and operational checklists
+6. inbound lead creation using workspace API keys
+7. broader inbound automation coverage beyond lead capture

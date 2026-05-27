@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceRolePermissionRecord } from "@/lib/permissions/rolePermissions";
 import type {
   ActiveWorkspaceContext,
   Workspace,
   WorkspaceBranding,
   WorkspaceModules,
-  WorkspaceRolePermission,
   WorkspaceRole,
 } from "@/types/domain";
 import { getDefaultRolePermission } from "@/lib/permissions/workspace";
@@ -74,6 +74,10 @@ export async function getActiveWorkspace(): Promise<ActiveWorkspaceResult> {
   }
 
   const workspaceId = member.workspace_id;
+  const rolePermissionsPromise =
+    member.role === "owner"
+      ? Promise.resolve({ data: null, error: null })
+      : getWorkspaceRolePermissionRecord(supabase, workspaceId, member.role);
 
   const [
     { data: workspace, error: workspaceError },
@@ -102,16 +106,7 @@ export async function getActiveWorkspace(): Promise<ActiveWorkspaceResult> {
       )
       .eq("workspace_id", workspaceId)
       .maybeSingle<WorkspaceModules>(),
-    member.role === "owner"
-      ? Promise.resolve({ data: null, error: null })
-      : supabase
-          .from("workspace_role_permissions")
-          .select(
-            "id,workspace_id,role,can_view_settings,can_edit_basic_settings,can_edit_branding,can_manage_modules,can_manage_pipeline,can_create_leads,can_create_jobs,can_create_tasks,can_create_appointments,can_view_audit_logs,created_at,updated_at",
-          )
-          .eq("workspace_id", workspaceId)
-          .eq("role", member.role)
-          .maybeSingle<WorkspaceRolePermission>(),
+    rolePermissionsPromise,
   ]);
 
   if (workspaceError || brandingError || modulesError || rolePermissionsError) {

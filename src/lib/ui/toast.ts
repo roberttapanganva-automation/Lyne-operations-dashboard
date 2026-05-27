@@ -52,6 +52,16 @@ export const notify = {
       description: normalizeDescription(description),
     });
   },
+  simpleSuccess(title: string, description?: ToastDescription) {
+    return gooeyToast.success(title, {
+      ...defaultToastOptions,
+      description: normalizeDescription(description),
+      showProgress: false,
+      timing: {
+        displayDuration: 2000,
+      },
+    });
+  },
   error(title: string, description?: ToastDescription) {
     return gooeyToast.error(title, {
       ...defaultToastOptions,

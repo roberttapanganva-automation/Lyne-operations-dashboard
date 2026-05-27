@@ -116,7 +116,7 @@ export function AccountSecurityCard({
           <EnvelopeSimpleIcon aria-hidden="true" size={18} />
           {isSending ? "Sending..." : "Send password reset email"}
         </Button>
-        <SignOutButton variant="secondary" />
+        <SignOutButton confirmationMode="dialog" variant="secondary" />
       </div>
     </>
   );

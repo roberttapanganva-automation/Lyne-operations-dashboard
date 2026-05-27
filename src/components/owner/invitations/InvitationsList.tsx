@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { copyTextToClipboard } from "@/lib/client/clipboard";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { WorkspaceInvitation } from "@/types/domain";
@@ -47,13 +48,23 @@ export function InvitationsList({
 
     try {
       const link = `${window.location.origin}/invite/${invitationId}`;
-      await navigator.clipboard.writeText(link);
+      const result = await copyTextToClipboard(link);
+
+      if (!result.ok) {
+        const failureMessage =
+          "Copy blocked by browser. Select the text and copy manually.";
+        setMessage(failureMessage);
+        notify.error("Invite link copy failed", failureMessage);
+        return;
+      }
+
       setMessage("Invite link copied.");
-      notify.success("Invite link copied");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Invite link copy failed.";
-      setMessage(message);
-      notify.error("Invite link copy failed", message);
+      notify.simpleSuccess("Copied");
+    } catch {
+      const failureMessage =
+        "Copy blocked by browser. Select the text and copy manually.";
+      setMessage(failureMessage);
+      notify.error("Invite link copy failed", failureMessage);
     } finally {
       setCopyingId(null);
     }

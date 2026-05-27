@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { triggerAutomationForWorkspace } from "@/lib/n8n/client";
+import { canViewAutomations } from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 import { triggerAutomationSchema } from "@/lib/validation/automations";
@@ -57,6 +58,25 @@ export async function POST(request: Request) {
         ok: false,
       },
       getStatusForWorkspaceResult(activeWorkspace.status),
+    );
+  }
+
+  if (
+    !canViewAutomations(
+      activeWorkspace.context.role,
+      activeWorkspace.context.rolePermissions,
+    )
+  ) {
+    return jsonResponse<AutomationTriggerResult>(
+      {
+        error: {
+          code: "FORBIDDEN",
+          message:
+            "Automations are limited to owner, admin, and manager roles unless the owner enables access for your role.",
+        },
+        ok: false,
+      },
+      403,
     );
   }
 

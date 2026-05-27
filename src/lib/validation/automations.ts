@@ -1,11 +1,13 @@
 import { z } from "zod";
 
 export const automationTriggerTypes = [
+  "lead.created",
   "job.assigned",
   "lead.assigned",
   "lead.auto_assigned",
   "new_lead_notification",
   "follow_up_reminder",
+  "pipeline.card.moved",
   "task.assigned",
   "task.auto_created",
   "test_connection",

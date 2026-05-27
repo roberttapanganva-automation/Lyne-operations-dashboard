@@ -7,6 +7,7 @@ import {
   CheckCircleIcon,
   ClockCounterClockwiseIcon,
   ExclamationMarkIcon,
+  KeyIcon,
   LightningIcon,
   PaperPlaneTiltIcon,
   PlugsConnectedIcon,
@@ -16,13 +17,20 @@ import { AutomationRunDetailsDialog } from "@/components/automations/AutomationR
 import { AutomationStatusBadge } from "@/components/automations/AutomationStatusBadge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import {
+  formatAutomationEventName,
+  formatAutomationRelatedType,
+  getAutomationSourceLabel,
+  sanitizeAutomationErrorMessage,
+} from "@/lib/automations/presentation";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { AutomationLog, AutomationLogStatus } from "@/types/domain";
 
-type AutomationFilter = "all" | "success" | "failed" | "pending";
+type AutomationFilter = "all" | "success" | "failed" | "pending" | "skipped";
 
 type AutomationsPanelProps = {
+  canManageApiAccess: boolean;
   isN8nConfigured: boolean;
   logs: AutomationLog[];
 };
@@ -40,18 +48,11 @@ const filterOptions: Array<{ key: AutomationFilter; label: string }> = [
   { key: "all", label: "All" },
   { key: "success", label: "Success" },
   { key: "failed", label: "Failed" },
-  { key: "pending", label: "Pending / skipped" },
+  { key: "pending", label: "Pending" },
+  { key: "skipped", label: "Skipped" },
 ];
 
-const pendingStatuses: AutomationLogStatus[] = ["pending", "skipped", "retrying"];
-
-function formatEventName(value: string) {
-  return value
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
+const pendingStatuses: AutomationLogStatus[] = ["pending", "retrying"];
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -60,21 +61,17 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function formatRelatedType(value: string) {
-  return value
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
 function getFilteredLogs(logs: AutomationLog[], filter: AutomationFilter) {
   if (filter === "all") {
     return logs;
   }
 
   if (filter === "pending") {
-    return logs.filter((log) => pendingStatuses.includes(log.status));
+    return logs.filter((log) => log.status === "pending" || log.status === "retrying");
+  }
+
+  if (filter === "skipped") {
+    return logs.filter((log) => log.status === "skipped");
   }
 
   return logs.filter((log) => log.status === filter);
@@ -93,7 +90,11 @@ function getLastTestLog(logs: AutomationLog[]) {
   return logs.find((log) => log.automation_type === "test_connection") ?? null;
 }
 
-export function AutomationsPanel({ isN8nConfigured, logs }: AutomationsPanelProps) {
+export function AutomationsPanel({
+  canManageApiAccess,
+  isN8nConfigured,
+  logs,
+}: AutomationsPanelProps) {
   const router = useRouter();
   const [filter, setFilter] = useState<AutomationFilter>("all");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -240,6 +241,33 @@ export function AutomationsPanel({ isN8nConfigured, logs }: AutomationsPanelProp
         </div>
       </section>
 
+      {canManageApiAccess ? (
+        <Card className="p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--ops-primary-soft)] text-[var(--workspace-primary,var(--ops-primary-dark))]">
+                <KeyIcon aria-hidden="true" className="size-5" weight="duotone" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-[var(--ops-text)]">
+                  API Access
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--ops-text-soft)]">
+                  Create secure API keys for external automation builders like
+                  n8n, Zapier, Make, or custom scripts.
+                </p>
+              </div>
+            </div>
+            <a
+              className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-[var(--workspace-primary,var(--ops-primary))] px-4 text-sm font-semibold text-white shadow-lg shadow-[var(--workspace-primary-glow,var(--ops-primary-glow))] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+              href="/automations/api-access"
+            >
+              Manage API access
+            </a>
+          </div>
+        </Card>
+      ) : null}
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {[
           {
@@ -345,8 +373,8 @@ export function AutomationsPanel({ isN8nConfigured, logs }: AutomationsPanelProp
         <div className="p-5">
           {logs.length === 0 ? (
             <EmptyState
-              description="No automation runs yet. Create a lead or send a test event to start tracking automation activity."
-              title="No automation runs yet"
+              description="Create a lead or send a test event to start tracking automation activity."
+              title="No automation activity yet."
             />
           ) : filteredLogs.length === 0 ? (
             <EmptyState
@@ -366,12 +394,15 @@ export function AutomationsPanel({ isN8nConfigured, logs }: AutomationsPanelProp
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2.5">
                         <h3 className="text-sm font-semibold text-[var(--ops-text)]">
-                          {formatEventName(log.automation_type)}
+                          {formatAutomationEventName(log.automation_type)}
                         </h3>
                         <AutomationStatusBadge status={log.status} />
                         <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--ops-text-soft)]">
                           <LightningIcon className="size-3.5" weight="duotone" />
-                          {formatRelatedType(log.related_type)}
+                          {formatAutomationRelatedType(log.related_type)}
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-[var(--ops-card)] px-2.5 py-1 text-xs font-semibold text-[var(--ops-text-muted)]">
+                          {getAutomationSourceLabel(log)}
                         </span>
                       </div>
                       <p className="mt-2 text-sm leading-6 text-[var(--ops-text-soft)]">
@@ -379,7 +410,7 @@ export function AutomationsPanel({ isN8nConfigured, logs }: AutomationsPanelProp
                       </p>
                       {log.error_message ? (
                         <p className="mt-2 text-xs font-medium text-[var(--ops-danger)]">
-                          {log.error_message}
+                          {sanitizeAutomationErrorMessage(log.error_message)}
                         </p>
                       ) : null}
                     </div>

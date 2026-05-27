@@ -73,6 +73,7 @@ Current migrations in repo:
 20260519002532_automation_logs_update_policy.sql
 20260519013005_user_avatars_bucket.sql
 20260520093000_fix_user_avatars_public_bucket.sql
+20260526180003_workspace_api_access_keys.sql
 ```
 
 ## Current Schema Status
@@ -104,6 +105,8 @@ Current migrations in repo:
 - `assignment_rule_members`
 - `assigned_member_id`, `assigned_at`, and `assigned_by` on leads, jobs, and tasks
 - `workspace-branding` storage bucket
+- `workspace_api_keys`
+- `workspace_api_key_secrets`
 
 ### Planned
 
@@ -272,6 +275,27 @@ Expected status values include:
 - skipped
 
 n8n failures should be logged here without breaking core CRUD actions.
+
+### `workspace_api_keys`
+
+Workspace-scoped metadata for inbound automation API keys.
+
+Rules:
+
+- owner/admin manage keys from `/automations/api-access`
+- raw keys are shown once and never stored
+- key prefixes and suffixes may be displayed
+- revoked keys are soft-revoked instead of hard-deleted by default
+
+### `workspace_api_key_secrets`
+
+Stores only API key hashes.
+
+Rules:
+
+- `key_hash` must never be returned to client code
+- no normal app flow uses a service role key to read secrets
+- inbound verification hashes the bearer key server-side and verifies through a safe RPC
 
 ## RLS Direction
 

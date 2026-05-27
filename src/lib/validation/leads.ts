@@ -5,6 +5,13 @@ const optionalText = z.preprocess(
   z.string().trim().optional(),
 );
 
+const boundedOptionalText = (max: number) =>
+  z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.string().trim().max(max).optional(),
+  );
+
 const optionalEmail = z.preprocess(
   (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
   z.string().trim().email("Enter a valid email address.").optional(),
@@ -56,6 +63,36 @@ export const createLeadSchema = z.object({
   title: z.string().trim().min(1, "Lead title is required."),
 });
 
+export const createInboundLeadSchema = z
+  .object({
+    email: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() === "" ? undefined : value,
+      z.string().trim().email("Enter a valid email address.").max(320).optional(),
+    ),
+    estimated_value: optionalNumber.default(0),
+    message: boundedOptionalText(2000),
+    name: z.string().trim().min(1, "Lead name is required.").max(160),
+    phone: boundedOptionalText(32),
+    preferred_date: z.preprocess((value) => {
+      if (typeof value === "string" && value.trim() === "") {
+        return undefined;
+      }
+
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+
+      if (typeof value === "string" && !Number.isNaN(Date.parse(value))) {
+        return new Date(value).toISOString();
+      }
+
+      return value;
+    }, z.string().refine((value) => !Number.isNaN(Date.parse(value)), "Enter a valid preferred date.").optional()),
+    source: boundedOptionalText(80).default("Automation"),
+  })
+  .strict();
+
 export const updateLeadSchema = z.object({
   assigned_member_id: optionalNullableUuid,
   estimated_value: optionalNumber.default(0),
@@ -90,5 +127,6 @@ export const bulkLeadActionSchema = z.object({
 
 export type BulkLeadActionInput = z.infer<typeof bulkLeadActionSchema>;
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
+export type CreateInboundLeadInput = z.infer<typeof createInboundLeadSchema>;
 export type ImportLeadRowInput = z.infer<typeof importLeadRowSchema>;
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;

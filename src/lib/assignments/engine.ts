@@ -17,6 +17,7 @@ import {
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 type RecordRow = {
+  assigned_member_id?: string | null;
   id: string;
   title?: string | null;
   workspace_id: string;
@@ -142,7 +143,7 @@ async function getRecordForTarget({
   const tableName = tableByTarget[targetType];
   const { data, error } = await supabase
     .from(tableName)
-    .select("id,workspace_id,title")
+    .select("id,workspace_id,title,assigned_member_id")
     .eq("id", recordId)
     .eq("workspace_id", workspaceId)
     .maybeSingle<RecordRow>();
@@ -316,6 +317,20 @@ export async function assignRecordManually({
       });
     }
 
+    const changed =
+      (record.assigned_member_id ?? null) !== (assignedMemberId ?? null);
+
+    if (!changed) {
+      return {
+        assigned_member: assignedMember,
+        assigned_member_id: assignedMember?.id ?? null,
+        changed: false,
+        ok: true,
+        record_id: recordId,
+        target_type: targetType,
+      };
+    }
+
     await updateRecordAssignment({
       actorUserId,
       assignedMember,
@@ -340,6 +355,7 @@ export async function assignRecordManually({
     return {
       assigned_member: assignedMember,
       assigned_member_id: assignedMember?.id ?? null,
+      changed: true,
       ok: true,
       record_id: recordId,
       target_type: targetType,

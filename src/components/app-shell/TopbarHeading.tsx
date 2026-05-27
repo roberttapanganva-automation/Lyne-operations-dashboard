@@ -7,11 +7,13 @@ import {
   CheckSquareIcon,
   CrownIcon,
   GearSixIcon,
+  KeyIcon,
   RowsIcon,
   UserCircleIcon,
   UsersThreeIcon,
 } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
+import { Badge } from "@/components/ui/Badge";
 
 type TopbarHeadingProps = {
   displayName: string;
@@ -19,6 +21,8 @@ type TopbarHeadingProps = {
 };
 
 export const routeTitles: Array<{
+  badgeLabel?: string;
+  badgeVariant?: "default" | "success" | "warning" | "danger" | "info";
   Icon: typeof UsersThreeIcon;
   match: RegExp;
   subtitle?: string;
@@ -116,6 +120,13 @@ export const routeTitles: Array<{
     title: "Pipelines",
   },
   {
+    Icon: KeyIcon,
+    match: /^\/automations\/api-access/,
+    subtitle:
+      "Create secure workspace API keys for n8n, Zapier, Make, or custom automation tools.",
+    title: "API Access",
+  },
+  {
     Icon: BriefcaseIcon,
     match: /^\/automations/,
     subtitle:
@@ -140,7 +151,9 @@ export const routeTitles: Array<{
     Icon: GearSixIcon,
     match: /^\/settings/,
     subtitle:
-      "Manage workspace details, branding, modules, templates, and system preferences.",
+      "Review your account context and personal preferences. Workspace-wide controls stay in Owner Console.",
+    badgeLabel: "Personal access",
+    badgeVariant: "warning",
     title: "Settings",
   },
 ];
@@ -166,6 +179,8 @@ export function TopbarHeading({
   const routeMatch = getTopbarRouteMatch(pathname);
   const routeTitle = routeMatch?.title ?? "Workspace";
   const RouteIcon = routeMatch?.Icon;
+  const routeBadgeLabel = routeMatch?.badgeLabel ?? null;
+  const routeBadgeVariant = routeMatch?.badgeVariant ?? "default";
   const routeSubtitle = routeMatch?.subtitle ?? null;
   const hasStrongTitleTreatment = Boolean(routeSubtitle);
 
@@ -189,6 +204,11 @@ export function TopbarHeading({
         >
           {routeTitle}
         </h1>
+        {routeBadgeLabel ? (
+          <Badge className="shrink-0" variant={routeBadgeVariant}>
+            {routeBadgeLabel}
+          </Badge>
+        ) : null}
       </div>
       {routeSubtitle ? (
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ops-text-soft)]">

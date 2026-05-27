@@ -234,6 +234,7 @@ export type AssignmentResult = {
   assigned_member: AssignableWorkspaceMember | null;
   assigned_member_id: string | null;
   auto_created_task_id?: string | null;
+  changed?: boolean;
   error?: string | null;
   notify_assignee?: boolean;
   ok: boolean;
@@ -314,6 +315,7 @@ export type WorkspaceRolePermission = {
   can_create_jobs: boolean;
   can_create_leads: boolean;
   can_create_tasks: boolean;
+  can_view_automations: boolean;
   can_edit_basic_settings: boolean;
   can_edit_branding: boolean;
   can_manage_modules: boolean;
@@ -463,6 +465,38 @@ export type AutomationLog = {
   related_type: string;
   status: AutomationLogStatus;
   workspace_id: string;
+};
+
+export type WorkspaceApiKeyScope = "lead:create" | "automation_logs:read";
+
+export type WorkspaceApiKeyStatus = "active" | "revoked" | "expired";
+
+export type WorkspaceApiKey = {
+  created_at: string;
+  created_by: string | null;
+  expires_at: string | null;
+  id: string;
+  key_prefix: string;
+  key_suffix: string;
+  last_failed_at: string | null;
+  last_used_at: string | null;
+  name: string;
+  revoked_at: string | null;
+  revoked_by: string | null;
+  scopes: WorkspaceApiKeyScope[];
+  status: WorkspaceApiKeyStatus;
+  updated_at: string;
+  workspace_id: string;
+};
+
+export type WorkspaceApiKeyCreateResult = {
+  apiKey: WorkspaceApiKey;
+  rawKey: string;
+};
+
+export type WorkspaceApiKeyVerificationResult = {
+  scopes: WorkspaceApiKeyScope[];
+  workspaceName: string;
 };
 
 export type DashboardOverview = {

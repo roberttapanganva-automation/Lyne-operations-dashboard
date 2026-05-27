@@ -13,6 +13,7 @@ import {
 import {
   canAccessOwnerConsole,
   canManageWorkspaceSettings,
+  canViewAutomations,
   canViewReports,
 } from "@/lib/permissions/workspace";
 import type { ActiveWorkspaceContext } from "@/types/domain";
@@ -131,6 +132,16 @@ export function getVisibleNavItems(workspaceContext: ActiveWorkspaceContext) {
     }
 
     if (item.moduleKey) {
+      if (
+        item.href === "/automations" &&
+        !canViewAutomations(
+          workspaceContext.role,
+          workspaceContext.rolePermissions,
+        )
+      ) {
+        return false;
+      }
+
       if (item.href === "/reports" && !canViewReports(workspaceContext.role)) {
         return false;
       }

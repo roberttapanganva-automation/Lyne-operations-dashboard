@@ -108,18 +108,20 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     revalidateTaskPages();
 
-    after(() =>
-      triggerAutomationForWorkspace({
-        automationType: "task.assigned",
-        payload: {
-          assigned_member_id: result.assigned_member_id,
-        },
-        relatedId: taskIdResult.data,
-        relatedType: "task",
-        supabase,
-        workspaceId: activeWorkspace.context.workspace.id,
-      }),
-    );
+    if (result.changed) {
+      after(() =>
+        triggerAutomationForWorkspace({
+          automationType: "task.assigned",
+          payload: {
+            assigned_member_id: result.assigned_member_id,
+          },
+          relatedId: taskIdResult.data,
+          relatedType: "task",
+          supabase,
+          workspaceId: activeWorkspace.context.workspace.id,
+        }),
+      );
+    }
 
     return jsonResponse<AssignmentResult>({
       data: result,

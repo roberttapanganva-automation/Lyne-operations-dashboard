@@ -1,4 +1,8 @@
 import { getAssignableRoles } from "@/lib/permissions/workspace";
+import {
+  buildRolePermissionWritePayload,
+  listWorkspaceRolePermissionRecords,
+} from "@/lib/permissions/rolePermissions";
 import { getOwnerAccessContext } from "@/lib/owner/access";
 import { isPipelineSchemaPendingMessage } from "@/lib/pipelines/queries";
 import type {
@@ -45,6 +49,7 @@ export const defaultRolePermissions: Record<
     can_create_jobs: true,
     can_create_leads: true,
     can_create_tasks: true,
+    can_view_automations: true,
     can_edit_basic_settings: true,
     can_edit_branding: false,
     can_manage_modules: false,
@@ -58,6 +63,7 @@ export const defaultRolePermissions: Record<
     can_create_jobs: true,
     can_create_leads: true,
     can_create_tasks: true,
+    can_view_automations: true,
     can_edit_basic_settings: false,
     can_edit_branding: false,
     can_manage_modules: false,
@@ -71,6 +77,7 @@ export const defaultRolePermissions: Record<
     can_create_jobs: true,
     can_create_leads: true,
     can_create_tasks: true,
+    can_view_automations: false,
     can_edit_basic_settings: false,
     can_edit_branding: false,
     can_manage_modules: false,
@@ -84,6 +91,7 @@ export const defaultRolePermissions: Record<
     can_create_jobs: false,
     can_create_leads: false,
     can_create_tasks: false,
+    can_view_automations: false,
     can_edit_basic_settings: false,
     can_edit_branding: false,
     can_manage_modules: false,
@@ -100,13 +108,8 @@ async function ensureRolePermissions(
   },
 ) {
   const workspaceId = access.activeWorkspace.workspace.id;
-  const { data, error } = await access.supabase
-    .from("workspace_role_permissions")
-    .select(
-      "id,workspace_id,role,can_view_settings,can_edit_basic_settings,can_edit_branding,can_manage_modules,can_manage_pipeline,can_create_leads,can_create_jobs,can_create_tasks,can_create_appointments,can_view_audit_logs,created_at,updated_at",
-    )
-    .eq("workspace_id", workspaceId)
-    .returns<WorkspaceRolePermission[]>();
+  const { data, error, supportsAutomationsPermission } =
+    await listWorkspaceRolePermissionRecords(access.supabase, workspaceId);
 
   if (error) {
     throw new Error(error.message);
@@ -116,8 +119,13 @@ async function ensureRolePermissions(
   const missingRows = getAssignableRoles()
     .filter((role) => !existingRoles.has(role))
     .map((role) => ({
-      ...defaultRolePermissions[role],
-      workspace_id: workspaceId,
+      ...buildRolePermissionWritePayload(
+        {
+          ...defaultRolePermissions[role],
+          workspace_id: workspaceId,
+        },
+        supportsAutomationsPermission,
+      ),
     }));
 
   if (missingRows.length > 0) {
@@ -130,14 +138,10 @@ async function ensureRolePermissions(
     }
   }
 
-  const { data: refreshed, error: refreshedError } = await access.supabase
-    .from("workspace_role_permissions")
-    .select(
-      "id,workspace_id,role,can_view_settings,can_edit_basic_settings,can_edit_branding,can_manage_modules,can_manage_pipeline,can_create_leads,can_create_jobs,can_create_tasks,can_create_appointments,can_view_audit_logs,created_at,updated_at",
-    )
-    .eq("workspace_id", workspaceId)
-    .order("role", { ascending: true })
-    .returns<WorkspaceRolePermission[]>();
+  const {
+    data: refreshed,
+    error: refreshedError,
+  } = await listWorkspaceRolePermissionRecords(access.supabase, workspaceId);
 
   if (refreshedError) {
     throw new Error(refreshedError.message);

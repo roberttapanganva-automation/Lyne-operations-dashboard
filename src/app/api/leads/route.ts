@@ -414,7 +414,7 @@ export async function POST(request: Request) {
 
     after(() =>
       triggerAutomationForWorkspace({
-        automationType: "new_lead_notification",
+        automationType: "lead.created",
         payload: {
           estimated_value: lead.estimated_value,
           priority: lead.priority,

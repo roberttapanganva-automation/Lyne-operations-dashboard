@@ -2,6 +2,13 @@
 
 import { XIcon } from "@phosphor-icons/react";
 import { AutomationStatusBadge } from "@/components/automations/AutomationStatusBadge";
+import {
+  formatAutomationEventName,
+  formatAutomationPayload,
+  formatAutomationRelatedType,
+  getAutomationSourceLabel,
+  sanitizeAutomationErrorMessage,
+} from "@/lib/automations/presentation";
 import type { AutomationLog } from "@/types/domain";
 
 type AutomationRunDetailsDialogProps = {
@@ -10,39 +17,11 @@ type AutomationRunDetailsDialogProps = {
   open: boolean;
 };
 
-function formatEventName(value: string) {
-  return value
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function formatRelatedType(value: string) {
-  return value
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function formatPayload(value: AutomationLog["payload"]) {
-  if (!value) {
-    return "No payload recorded.";
-  }
-
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return "Payload could not be rendered.";
-  }
 }
 
 export function AutomationRunDetailsDialog({
@@ -71,7 +50,7 @@ export function AutomationRunDetailsDialog({
               className="mt-1 text-lg font-semibold text-[var(--ops-text)]"
               id="automation-run-title"
             >
-              {formatEventName(log.automation_type)}
+              {formatAutomationEventName(log.automation_type)}
             </h2>
           </div>
           <button
@@ -110,7 +89,15 @@ export function AutomationRunDetailsDialog({
                 Automation type
               </p>
               <p className="mt-2 text-sm text-[var(--ops-text)]">
-                {formatEventName(log.automation_type)}
+                {formatAutomationEventName(log.automation_type)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                Source
+              </p>
+              <p className="mt-2 text-sm text-[var(--ops-text)]">
+                {getAutomationSourceLabel(log)}
               </p>
             </div>
             <div>
@@ -118,10 +105,10 @@ export function AutomationRunDetailsDialog({
                 Related type
               </p>
               <p className="mt-2 text-sm text-[var(--ops-text)]">
-                {formatRelatedType(log.related_type)}
+                {formatAutomationRelatedType(log.related_type)}
               </p>
             </div>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-3">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                 Related id
               </p>
@@ -146,7 +133,7 @@ export function AutomationRunDetailsDialog({
                 Failure details
               </p>
               <p className="mt-2 text-sm leading-6 text-[var(--ops-danger)]">
-                {log.error_message}
+                {sanitizeAutomationErrorMessage(log.error_message)}
               </p>
             </div>
           ) : null}
@@ -156,7 +143,7 @@ export function AutomationRunDetailsDialog({
               Payload preview
             </summary>
             <pre className="mt-3 overflow-x-auto rounded-lg bg-slate-950 px-4 py-3 text-xs leading-6 text-slate-100">
-              {formatPayload(log.payload)}
+              {formatAutomationPayload(log.payload)}
             </pre>
           </details>
         </div>

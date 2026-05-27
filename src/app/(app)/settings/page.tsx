@@ -2,7 +2,6 @@ import Link from "next/link";
 import { PreferencesForm } from "@/components/settings/PreferencesForm";
 import { RestrictedSettingsState } from "@/components/settings/RestrictedSettingsState";
 import { SecuritySettingsPlaceholder } from "@/components/settings/SecuritySettingsPlaceholder";
-import { SettingsPageHeader } from "@/components/settings/SettingsPageHeader";
 import { TeamVisibility } from "@/components/settings/TeamVisibility";
 import { Card } from "@/components/ui/Card";
 import { getCurrentUserPreferences } from "@/lib/profile/preferences";
@@ -32,11 +31,6 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <SettingsPageHeader
-        canManageSettings={settings.canManageSettings}
-        role={settings.currentUserRole}
-      />
-
       {preferences ? <PreferencesForm preferences={preferences} /> : null}
 
       {settings.currentUserRole === "owner" ? (

@@ -108,18 +108,20 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     revalidateJobPages();
 
-    after(() =>
-      triggerAutomationForWorkspace({
-        automationType: "job.assigned",
-        payload: {
-          assigned_member_id: result.assigned_member_id,
-        },
-        relatedId: jobIdResult.data,
-        relatedType: "job",
-        supabase,
-        workspaceId: activeWorkspace.context.workspace.id,
-      }),
-    );
+    if (result.changed) {
+      after(() =>
+        triggerAutomationForWorkspace({
+          automationType: "job.assigned",
+          payload: {
+            assigned_member_id: result.assigned_member_id,
+          },
+          relatedId: jobIdResult.data,
+          relatedType: "job",
+          supabase,
+          workspaceId: activeWorkspace.context.workspace.id,
+        }),
+      );
+    }
 
     return jsonResponse<AssignmentResult>({
       data: result,

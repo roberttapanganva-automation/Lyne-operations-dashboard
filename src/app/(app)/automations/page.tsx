@@ -1,6 +1,7 @@
 import { AutomationsPanel } from "@/components/automations/AutomationsPanel";
 import { Card } from "@/components/ui/Card";
 import { isN8nConfigured } from "@/lib/n8n/client";
+import { canViewAutomations } from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 import type { AutomationLog } from "@/types/domain";
@@ -37,6 +38,25 @@ export default async function AutomationsPage() {
     );
   }
 
+  if (
+    !canViewAutomations(
+      activeWorkspace.context.role,
+      activeWorkspace.context.rolePermissions,
+    )
+  ) {
+    return (
+      <Card className="p-6">
+        <p className="text-sm font-semibold text-[var(--ops-text)]">
+          Automations unavailable
+        </p>
+        <p className="mt-2 text-sm text-[var(--ops-text-soft)]">
+          Automations are limited to owner, admin, and manager roles unless the
+          owner enables access for your role.
+        </p>
+      </Card>
+    );
+  }
+
   const { data, error } = await supabase
     .from("automation_logs")
     .select(
@@ -62,6 +82,10 @@ export default async function AutomationsPage() {
 
   return (
     <AutomationsPanel
+      canManageApiAccess={
+        activeWorkspace.context.role === "owner" ||
+        activeWorkspace.context.role === "admin"
+      }
       isN8nConfigured={isN8nConfigured()}
       logs={data ?? []}
     />

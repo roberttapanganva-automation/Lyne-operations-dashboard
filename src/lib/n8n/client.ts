@@ -25,6 +25,8 @@ export type AutomationTriggerResult = {
   status: AutomationLogStatus;
 };
 
+export type AutomationDeliveryResult = Omit<AutomationTriggerResult, "logId">;
+
 type AutomationLogInsert = {
   automation_type: string;
   error_message?: string | null;
@@ -113,6 +115,7 @@ function buildAutomationPayload(args: {
 }) {
   return {
     automation_type: args.automationType,
+    automation_source: "system",
     event: args.automationType,
     payload: args.payload,
     related_id: args.relatedId,
@@ -141,6 +144,79 @@ async function buildN8nResponsePayload(response: Response) {
     status: response.status,
     status_text: response.statusText,
   };
+}
+
+export async function deliverAutomationWebhook({
+  automationType,
+  payload = {},
+  relatedId = null,
+  relatedType,
+  workspaceId,
+}: Omit<TriggerAutomationForWorkspaceArgs, "supabase">): Promise<AutomationDeliveryResult> {
+  const { signingSecret, webhookUrl } = getN8nConfig();
+  const automationPayload = buildAutomationPayload({
+    automationType,
+    payload,
+    relatedId,
+    relatedType,
+    workspaceId,
+  });
+
+  if (!webhookUrl || !signingSecret) {
+    return {
+      configured: false,
+      delivered: false,
+      errorMessage: null,
+      message: "n8n webhook is not configured.",
+      status: "skipped",
+    };
+  }
+
+  try {
+    const serializedPayload = JSON.stringify(automationPayload);
+    const response = await fetch(webhookUrl, {
+      body: serializedPayload,
+      headers: {
+        "content-type": "application/json",
+        "x-opspilot-event": automationType,
+        "x-opspilot-signature": signN8nPayload(
+          serializedPayload,
+          signingSecret,
+        ),
+        "x-opspilot-workspace-id": workspaceId,
+      },
+      method: "POST",
+      signal: AbortSignal.timeout(10000),
+    });
+    const responsePayload = await buildN8nResponsePayload(response);
+
+    if (!response.ok) {
+      return {
+        configured: true,
+        delivered: false,
+        errorMessage: getN8nErrorMessage(responsePayload),
+        message: "n8n automation failed.",
+        status: "failed",
+      };
+    }
+
+    return {
+      configured: true,
+      delivered: true,
+      errorMessage: null,
+      message: "n8n automation completed.",
+      status: "success",
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      delivered: false,
+      errorMessage:
+        error instanceof Error ? error.message : "n8n webhook request failed.",
+      message: "n8n automation failed.",
+      status: "failed",
+    };
+  }
 }
 
 function getN8nErrorMessage(
@@ -176,7 +252,6 @@ export async function triggerAutomationForWorkspace({
   supabase,
   workspaceId,
 }: TriggerAutomationForWorkspaceArgs): Promise<AutomationTriggerResult> {
-  const { signingSecret, webhookUrl } = getN8nConfig();
   const automationPayload = buildAutomationPayload({
     automationType,
     payload,
@@ -185,7 +260,7 @@ export async function triggerAutomationForWorkspace({
     workspaceId,
   });
 
-  if (!webhookUrl || !signingSecret) {
+  if (!isN8nConfigured()) {
     const message = "n8n webhook is not configured.";
     const { id } = await insertAutomationLog(supabase, {
       automation_type: automationType,
@@ -220,49 +295,24 @@ export async function triggerAutomationForWorkspace({
   let delivered = false;
   let errorMessage: string | null = null;
   let message = "n8n automation failed.";
-  let responsePayload: Awaited<ReturnType<typeof buildN8nResponsePayload>> | null =
-    null;
   let status: AutomationLogStatus = "failed";
 
-  try {
-    const serializedPayload = JSON.stringify(automationPayload);
-    const response = await fetch(webhookUrl, {
-      body: serializedPayload,
-      headers: {
-        "content-type": "application/json",
-        "x-opspilot-event": automationType,
-        "x-opspilot-signature": signN8nPayload(
-          serializedPayload,
-          signingSecret,
-        ),
-        "x-opspilot-workspace-id": workspaceId,
-      },
-      method: "POST",
-      signal: AbortSignal.timeout(10000),
-    });
-    responsePayload = await buildN8nResponsePayload(response);
-
-    if (!response.ok) {
-      errorMessage = getN8nErrorMessage(responsePayload);
-    } else {
-      delivered = true;
-      message = "n8n automation completed.";
-      status = "success";
-    }
-  } catch (error) {
-    errorMessage =
-      error instanceof Error ? error.message : "n8n webhook request failed.";
-  }
+  const delivery = await deliverAutomationWebhook({
+    automationType,
+    payload,
+    relatedId,
+    relatedType,
+    workspaceId,
+  });
+  delivered = delivery.delivered;
+  errorMessage = delivery.errorMessage ?? null;
+  message = delivery.message;
+  status = delivery.status;
 
   await updateAutomationLog(supabase, pendingLog.id, {
     error_message: errorMessage,
     message,
-    payload: responsePayload
-      ? {
-          ...automationPayload,
-          response: responsePayload,
-        }
-      : automationPayload,
+    payload: automationPayload,
     status,
   });
 
