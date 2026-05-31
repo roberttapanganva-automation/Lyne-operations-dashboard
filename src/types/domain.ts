@@ -438,10 +438,12 @@ export type DashboardRevenueSummary = {
 };
 
 export type DashboardActivityItem = {
+  category: string;
   created_at: string;
   id: string;
   icon: string;
   message: string;
+  source: string;
   status: string | null;
   title: string;
   type: "automation" | "audit";

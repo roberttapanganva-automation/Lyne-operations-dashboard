@@ -29,7 +29,7 @@ export function getAccountInitials({
   const emailName = email?.split("@")[0]?.replace(/[._-]+/g, " ").trim() ?? "";
   const fromEmail = emailName ? sanitizeNamePart(emailName) : "";
 
-  return fromEmail || "OP";
+  return fromEmail || "LY";
 }
 
 export async function resolveAccountAvatarUrl({

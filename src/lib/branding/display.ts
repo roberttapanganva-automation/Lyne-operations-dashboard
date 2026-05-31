@@ -1,3 +1,5 @@
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
+
 type BrandingDisplayInput = {
   branding: {
     app_name?: string | null;
@@ -7,30 +9,29 @@ type BrandingDisplayInput = {
   workspaceName?: string | null;
 };
 
-const DEFAULT_ICON_URL = "/opspilot-default-icon.svg";
-const DEFAULT_LOGO_URL = "/opspilot-default-logo.svg";
-
 export function getWorkspaceDisplayName({
   branding,
-  workspaceName,
 }: BrandingDisplayInput) {
   const appName = branding?.app_name?.trim();
   if (appName) {
     return appName;
   }
 
-  const fallbackWorkspace = workspaceName?.trim();
-  if (fallbackWorkspace) {
-    return fallbackWorkspace;
-  }
-
-  return "OpsPilot";
+  return DEFAULT_BRAND.appName;
 }
 
 export function getWorkspaceIconUrl({ branding }: BrandingDisplayInput) {
-  return branding?.icon_url || branding?.logo_url || DEFAULT_ICON_URL;
+  return (
+    branding?.icon_url?.trim() ||
+    branding?.logo_url?.trim() ||
+    DEFAULT_BRAND.iconUrl
+  );
 }
 
 export function getWorkspaceLogoUrl({ branding }: BrandingDisplayInput) {
-  return branding?.logo_url || DEFAULT_LOGO_URL;
+  return branding?.logo_url?.trim() || null;
+}
+
+export function getWorkspaceSubtitle() {
+  return DEFAULT_BRAND.subtitle;
 }

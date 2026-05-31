@@ -7,6 +7,7 @@ import {
   SparkleIcon,
   UserCircleGearIcon,
 } from "@phosphor-icons/react/ssr";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { getSupabaseEnvError, hasSupabaseEnv } from "@/lib/supabase/env";
 import { LoginForm } from "./LoginForm";
 
@@ -76,7 +77,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         className="absolute inset-0 -z-20"
         style={{
           background:
-            "radial-gradient(circle at 12% 92%, rgba(109, 93, 252, 0.28), transparent 30%), radial-gradient(circle at 86% 22%, rgba(109, 93, 252, 0.12), transparent 34%), linear-gradient(135deg, #ffffff 0%, #f6f7ff 45%, #eef2ff 100%)",
+            "radial-gradient(circle at 12% 92%, rgba(124, 92, 255, 0.28), transparent 30%), radial-gradient(circle at 86% 22%, rgba(139, 124, 255, 0.12), transparent 34%), linear-gradient(135deg, #ffffff 0%, #f6f7ff 45%, #eef2ff 100%)",
         }}
       />
       <div
@@ -84,26 +85,31 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         className="absolute left-1/2 top-14 -z-10 hidden h-28 w-40 -translate-x-1/2 opacity-60 md:block"
         style={{
           backgroundImage:
-            "radial-gradient(circle, rgba(109, 93, 252, 0.22) 1.5px, transparent 1.5px)",
+            "radial-gradient(circle, rgba(124, 92, 255, 0.22) 1.5px, transparent 1.5px)",
           backgroundSize: "24px 24px",
         }}
       />
       <div
         aria-hidden="true"
-        className="absolute -bottom-32 -left-24 -z-10 hidden h-80 w-[44rem] rounded-[50%] bg-[linear-gradient(135deg,rgba(109,93,252,0.28),rgba(79,70,229,0.08))] blur-2xl md:block"
+        className="absolute -bottom-32 -left-24 -z-10 hidden h-80 w-[44rem] rounded-[50%] bg-[linear-gradient(135deg,rgba(124,92,255,0.28),rgba(139,124,255,0.08))] blur-2xl md:block"
       />
 
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-[1600px] flex-col">
         <header className="flex shrink-0 items-center gap-4 py-2">
-          <span className="inline-flex size-12 items-center justify-center rounded-xl bg-[linear-gradient(135deg,var(--ops-primary),var(--ops-primary-dark))] text-base font-bold text-white shadow-[0_18px_38px_var(--ops-primary-glow)]">
-            OP
+          <span className="inline-flex size-12 items-center justify-center overflow-hidden rounded-xl bg-[var(--ops-sidebar)] shadow-[0_18px_38px_var(--ops-primary-glow)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              alt={`${DEFAULT_BRAND.appName} icon`}
+              className="h-full w-full object-cover"
+              src={DEFAULT_BRAND.iconUrl}
+            />
           </span>
           <div>
             <p className="text-xl font-semibold tracking-tight text-[#0a102f]">
-              OpsPilot
+              {DEFAULT_BRAND.appName}
             </p>
             <p className="text-sm font-medium text-slate-600">
-              ServiceOps Command Center
+              {DEFAULT_BRAND.subtitle}
             </p>
           </div>
         </header>
@@ -152,8 +158,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 aria-hidden="true"
                 className="pointer-events-none relative mt-8 hidden h-64 max-w-4xl md:block"
               >
-                <div className="absolute bottom-[-11rem] left-[-12rem] h-80 w-[58rem] rotate-[10deg] rounded-[50%] bg-[linear-gradient(135deg,rgba(109,93,252,0.30),rgba(109,93,252,0.12)_46%,rgba(255,255,255,0)_70%)]" />
-                <div className="absolute bottom-[-9rem] left-[-12rem] h-80 w-[38rem] rounded-[50%] bg-[radial-gradient(circle_at_35%_45%,rgba(109,93,252,0.68),rgba(109,93,252,0.24)_45%,rgba(109,93,252,0)_72%)] blur-xl" />
+                <div className="absolute bottom-[-10rem] left-[-18rem] h-[22rem] w-[60rem] rotate-[10deg] rounded-[50%] bg-[linear-gradient(135deg,rgba(124,92,255,0.78)_0%,rgba(139,124,255,0.58)_44%,rgba(176,160,255,0.25)_66%,rgba(255,255,255,0)_82%)]" />
+                <div className="absolute bottom-[-12rem] left-[-22rem] h-[27rem] w-[46rem] rounded-[50%] bg-[radial-gradient(circle_at_58%_32%,rgba(124,92,255,0.88),rgba(139,124,255,0.48)_45%,rgba(124,92,255,0)_74%)] blur-xl" />
+                <div className="absolute bottom-[-4.5rem] left-[-9rem] h-44 w-[34rem] rotate-[12deg] rounded-[50%] bg-[linear-gradient(135deg,rgba(255,255,255,0.24),rgba(255,255,255,0)_64%)]" />
                 <div
                   className="absolute bottom-5 left-[-1rem] h-20 w-36 opacity-70"
                   style={{
@@ -217,7 +224,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               <LoginForm envError={envError} />
             </div>
             <p className="mt-8 text-center text-xs text-slate-500">
-              © {currentYear} OpsPilot. All rights reserved.
+              &copy; {currentYear} {DEFAULT_BRAND.appName}. All rights reserved.
             </p>
           </section>
         </div>

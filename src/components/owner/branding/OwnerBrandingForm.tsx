@@ -7,6 +7,7 @@ import { BrandingColorPicker } from "@/components/owner/branding/BrandingColorPi
 import { BrandingPreviewCard } from "@/components/owner/branding/BrandingPreviewCard";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { notify } from "@/lib/ui/toast";
 import { normalizeHexColor, validateHexColor } from "@/lib/validation/branding";
 import type { ApiResponse } from "@/types/api";
@@ -19,9 +20,11 @@ export function OwnerBrandingForm({
 }) {
   const router = useRouter();
   const [accentColor, setAccentColor] = useState(
-    branding?.accent_color ?? "#4F46E5",
+    branding?.accent_color ?? DEFAULT_BRAND.accentColor,
   );
-  const [appName, setAppName] = useState(branding?.app_name ?? "OpsPilot");
+  const [appName, setAppName] = useState(
+    branding?.app_name ?? DEFAULT_BRAND.appName,
+  );
   const [error, setError] = useState<string | null>(null);
   const [iconUrl, setIconUrl] = useState(branding?.icon_url ?? null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,7 +36,7 @@ export function OwnerBrandingForm({
   );
   const [logoUrl, setLogoUrl] = useState(branding?.logo_url ?? null);
   const [primaryColor, setPrimaryColor] = useState(
-    branding?.primary_color ?? "#6D5DFC",
+    branding?.primary_color ?? DEFAULT_BRAND.primaryColor,
   );
   const [success, setSuccess] = useState<string | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(
@@ -52,7 +55,7 @@ export function OwnerBrandingForm({
       !validateHexColor(normalizedPrimaryColor) ||
       !validateHexColor(normalizedAccentColor)
     ) {
-      const errorMessage = "Use valid HEX colors like #6D5DFC.";
+      const errorMessage = `Use valid HEX colors like ${DEFAULT_BRAND.primaryColor}.`;
       setError(errorMessage);
       notify.warning("Check branding colors", errorMessage);
       setIsSubmitting(false);

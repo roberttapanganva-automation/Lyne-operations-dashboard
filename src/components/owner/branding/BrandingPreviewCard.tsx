@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { getWorkspaceDisplayName, getWorkspaceIconUrl } from "@/lib/branding/display";
 
 type BrandingPreviewCardProps = {
@@ -41,7 +42,7 @@ export function BrandingPreviewCard({
         <div className="flex min-h-36">
           <aside
             className="hidden w-28 shrink-0 p-4 sm:block"
-            style={{ backgroundColor: "#071327" }}
+            style={{ backgroundColor: DEFAULT_BRAND.darkColor }}
           >
             <div
               className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-[var(--ops-sidebar-card)] shadow-[0_8px_24px_var(--ops-primary-glow)]"
@@ -54,7 +55,7 @@ export function BrandingPreviewCard({
                   src={resolvedIconUrl}
                 />
               ) : (
-                <span className="text-sm font-bold text-white">OP</span>
+                <span className="text-sm font-bold text-white">Ly</span>
               )}
             </div>
             <div className="mt-5 h-2 rounded-full" style={{ backgroundColor: primaryColor }} />
@@ -72,7 +73,7 @@ export function BrandingPreviewCard({
                     src={resolvedIconUrl}
                   />
                 ) : (
-                  <span className="text-sm font-bold text-white">OP</span>
+                  <span className="text-sm font-bold text-white">Ly</span>
                 )}
               </div>
               <div className="min-w-0">
@@ -80,7 +81,7 @@ export function BrandingPreviewCard({
                   {displayName}
                 </p>
                 <p className="text-sm text-[var(--ops-text-soft)]">
-                  Command Center
+                  {DEFAULT_BRAND.subtitle}
                 </p>
               </div>
             </div>

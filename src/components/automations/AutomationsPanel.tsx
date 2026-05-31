@@ -23,6 +23,7 @@ import {
   getAutomationSourceLabel,
   sanitizeAutomationErrorMessage,
 } from "@/lib/automations/presentation";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { AutomationLog, AutomationLogStatus } from "@/types/domain";
@@ -157,7 +158,7 @@ export function AutomationsPanel({
         description: {
           error: (error) =>
             error instanceof Error ? error.message : "The test event could not be sent.",
-          loading: "OpsPilot is handing this event to n8n.",
+          loading: `${DEFAULT_BRAND.appName} is handing this event to n8n.`,
           success: "n8n received the automation event.",
         },
       });

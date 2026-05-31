@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import type { PipelineGroup, PipelineStage } from "@/types/domain";
 
 function normalizeHexColor(value: string) {
@@ -160,7 +161,7 @@ function StageRow({
                 setColor(normalizeHexColor(event.target.value))
               }
               type="color"
-              value={isHexColor(color) ? normalizeHexColor(color) : "#6D5DFC"}
+              value={isHexColor(color) ? normalizeHexColor(color) : DEFAULT_BRAND.primaryColor}
             />
           </div>
         </div>
@@ -228,7 +229,7 @@ export function PipelineStagesManager({
   onUpdate,
   stages,
 }: PipelineStagesManagerProps) {
-  const [color, setColor] = useState("#6D5DFC");
+  const [color, setColor] = useState<string>(DEFAULT_BRAND.primaryColor);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newStageName, setNewStageName] = useState("");
   const [newStageOrderIndex, setNewStageOrderIndex] = useState(
@@ -376,7 +377,7 @@ export function PipelineStagesManager({
                     setColor(normalizeHexColor(event.target.value))
                   }
                   type="color"
-                  value={isHexColor(color) ? normalizeHexColor(color) : "#6D5DFC"}
+                  value={isHexColor(color) ? normalizeHexColor(color) : DEFAULT_BRAND.primaryColor}
                 />
               </div>
             </div>

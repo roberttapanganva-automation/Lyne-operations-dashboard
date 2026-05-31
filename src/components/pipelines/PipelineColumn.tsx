@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
@@ -27,14 +28,15 @@ type PipelineColumnProps = {
 
 function hexToRgba(color: string, alpha: number) {
   const normalized = color.trim().replace("#", "");
+  const fallbackColor = DEFAULT_BRAND.primaryColor.replace("#", "");
 
-  if (!/^[0-9A-Fa-f]{6}$/.test(normalized)) {
-    return `rgba(109, 93, 252, ${alpha})`;
-  }
+  const source = /^[0-9A-Fa-f]{6}$/.test(normalized)
+    ? normalized
+    : fallbackColor;
 
-  const red = Number.parseInt(normalized.slice(0, 2), 16);
-  const green = Number.parseInt(normalized.slice(2, 4), 16);
-  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  const red = Number.parseInt(source.slice(0, 2), 16);
+  const green = Number.parseInt(source.slice(2, 4), 16);
+  const blue = Number.parseInt(source.slice(4, 6), 16);
 
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }

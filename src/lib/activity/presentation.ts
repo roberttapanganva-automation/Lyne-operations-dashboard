@@ -435,6 +435,34 @@ export function presentAuditActivity(
         icon: "task",
         title: "Task deleted",
       };
+    case "lead.assigned":
+      return {
+        category: "Assignments",
+        description: `${actor} updated ownership for ${entityName ?? "a lead"}.`,
+        icon: "lead",
+        title: "Lead assigned",
+      };
+    case "lead.auto_assigned":
+      return {
+        category: "Assignments",
+        description: `${entityName ?? "A lead"} was assigned by the round-robin rule.`,
+        icon: "automation",
+        title: "Lead auto-assigned",
+      };
+    case "job.assigned":
+      return {
+        category: "Assignments",
+        description: `${actor} updated ownership for ${entityName ?? "a job"}.`,
+        icon: "job",
+        title: "Job assigned",
+      };
+    case "task.assigned":
+      return {
+        category: "Assignments",
+        description: `${actor} updated ownership for ${entityName ?? "a task"}.`,
+        icon: "task",
+        title: "Task assigned",
+      };
     case "appointment.created":
       return {
         category: "Calendar",
@@ -533,6 +561,34 @@ export function presentAuditActivity(
         description: `${actor} updated workspace access rules and permissions.`,
         icon: "access",
         title: "Access rules updated",
+      };
+    case "api_key.created":
+      return {
+        category: "Automation",
+        description: `${actor} created a workspace API key for automation access.`,
+        icon: "automation",
+        title: "API key created",
+      };
+    case "api_key.revoked":
+      return {
+        category: "Automation",
+        description: `${actor} revoked a workspace API key.`,
+        icon: "automation",
+        title: "API key revoked",
+      };
+    case "api_key.renamed":
+      return {
+        category: "Automation",
+        description: `${actor} renamed a workspace API key.`,
+        icon: "automation",
+        title: "API key renamed",
+      };
+    case "api_key.rotated":
+      return {
+        category: "Automation",
+        description: `${actor} rotated a workspace API key.`,
+        icon: "automation",
+        title: "API key rotated",
       };
     default:
       return {

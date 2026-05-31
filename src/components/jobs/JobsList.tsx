@@ -211,14 +211,16 @@ export function JobsList({
   return (
     <>
       <div className="space-y-3">
-        <BulkActionBar
-          canDelete={canDeleteRecords}
-          canEdit={false}
-          entityLabel="job"
-          onClearSelection={clearSelection}
-          onDelete={() => setBulkDeleteOpen(true)}
-          selectedCount={visibleSelectedIds.length}
-        />
+        {canDeleteRecords ? (
+          <BulkActionBar
+            canDelete
+            canEdit={false}
+            entityLabel="job"
+            onClearSelection={clearSelection}
+            onDelete={() => setBulkDeleteOpen(true)}
+            selectedCount={visibleSelectedIds.length}
+          />
+        ) : null}
         {bulkDeleteError ? (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--ops-danger)]">
             {bulkDeleteError}
@@ -259,15 +261,17 @@ export function JobsList({
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--ops-card-soft)] text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
             <tr>
-              <th className="px-5 py-3 sm:px-6" scope="col">
-                <input
-                  aria-label="Select all jobs"
-                  checked={allSelected}
-                  className="h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
-                  onChange={toggleSelectAll}
-                  type="checkbox"
-                />
-              </th>
+              {canDeleteRecords ? (
+                <th className="px-5 py-3 sm:px-6" scope="col">
+                  <input
+                    aria-label="Select all jobs"
+                    checked={allSelected}
+                    className="h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                    onChange={toggleSelectAll}
+                    type="checkbox"
+                  />
+                </th>
+              ) : null}
               <th className="px-5 py-3 sm:px-6" scope="col">
                 Job
               </th>
@@ -302,17 +306,19 @@ export function JobsList({
                 onDoubleClick={() => openJobEditor(job)}
                 title={canCreateRecords ? "Double-click to edit job" : undefined}
               >
-                <td className="px-5 py-4 sm:px-6">
-                  <input
-                    aria-label={`Select ${job.title}`}
-                    checked={selectedIds.includes(job.id)}
-                    className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
-                    onChange={() => toggleJobSelection(job.id)}
-                    onClick={(event) => event.stopPropagation()}
-                    onDoubleClick={(event) => event.stopPropagation()}
-                    type="checkbox"
-                  />
-                </td>
+                {canDeleteRecords ? (
+                  <td className="px-5 py-4 sm:px-6">
+                    <input
+                      aria-label={`Select ${job.title}`}
+                      checked={selectedIds.includes(job.id)}
+                      className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                      onChange={() => toggleJobSelection(job.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      onDoubleClick={(event) => event.stopPropagation()}
+                      type="checkbox"
+                    />
+                  </td>
+                ) : null}
                 <td className="px-5 py-4 sm:px-6">
                   <p className="font-medium text-[var(--ops-text)]">
                     {job.title}
@@ -374,15 +380,17 @@ export function JobsList({
               </div>
               <div className="flex items-start gap-3">
                 <JobStatusBadge status={job.status} />
-                <input
-                  aria-label={`Select ${job.title}`}
-                  checked={selectedIds.includes(job.id)}
-                  className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
-                  onChange={() => toggleJobSelection(job.id)}
-                  onClick={(event) => event.stopPropagation()}
-                  onDoubleClick={(event) => event.stopPropagation()}
-                  type="checkbox"
-                />
+                {canDeleteRecords ? (
+                  <input
+                    aria-label={`Select ${job.title}`}
+                    checked={selectedIds.includes(job.id)}
+                    className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                    onChange={() => toggleJobSelection(job.id)}
+                    onClick={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                    type="checkbox"
+                  />
+                ) : null}
               </div>
             </div>
 

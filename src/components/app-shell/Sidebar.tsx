@@ -11,6 +11,7 @@ import {
   getWorkspaceDisplayName,
   getWorkspaceIconUrl,
   getWorkspaceLogoUrl,
+  getWorkspaceSubtitle,
 } from "@/lib/branding/display";
 import type { ActiveWorkspaceContext } from "@/types/domain";
 import { getSidebarNavGroups, getUtilityNavItems } from "./nav-items";
@@ -42,18 +43,18 @@ export function Sidebar({
     branding: workspaceContext.branding,
     workspaceName: workspaceContext.workspace.name,
   });
-  const expandedAssetUrl =
-    getWorkspaceLogoUrl({
-      branding: workspaceContext.branding,
-      workspaceName: workspaceContext.workspace.name,
-    }) ?? collapsedAssetUrl;
+  const expandedAssetUrl = getWorkspaceLogoUrl({
+    branding: workspaceContext.branding,
+    workspaceName: workspaceContext.workspace.name,
+  });
+  const fallbackSubtitle = getWorkspaceSubtitle();
   const navGroups = getSidebarNavGroups(workspaceContext);
   const utilityItems = getUtilityNavItems(workspaceContext);
   const ToggleIcon = collapsed ? CaretRightIcon : CaretLeftIcon;
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 hidden shrink-0 overflow-hidden border-r border-white/5 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_28%),linear-gradient(180deg,#071327_0%,#091a31_100%)] text-[var(--ops-white)] transition-[width] duration-300 ease-out lg:flex lg:flex-col ${
+      className={`fixed inset-y-0 left-0 hidden shrink-0 overflow-hidden border-r border-white/5 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_28%),linear-gradient(180deg,#0B1020_0%,#101931_100%)] text-[var(--ops-white)] transition-[width] duration-300 ease-out lg:flex lg:flex-col ${
         collapsed ? "w-[78px]" : "w-[264px]"
       }`}
     >
@@ -85,17 +86,40 @@ export function Sidebar({
                 </span>
               ) : (
                 <span className="block min-w-0 text-center">
-                  <span className="flex min-h-[34px] items-center justify-center overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      alt={`${appName} logo`}
-                      className="max-h-8 w-auto max-w-full object-contain object-center"
-                      src={expandedAssetUrl}
-                    />
-                  </span>
-                  <span className="mt-1 block text-[11px] leading-4 text-white/55">
-                    Command Center
-                  </span>
+                  {expandedAssetUrl ? (
+                    <>
+                      <span className="flex min-h-[34px] items-center justify-center overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          alt={`${appName} logo`}
+                          className="max-h-8 w-auto max-w-full object-contain object-center"
+                          src={expandedAssetUrl}
+                        />
+                      </span>
+                      <span className="mt-1 block text-[11px] leading-4 text-white/55">
+                        {fallbackSubtitle}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="mx-auto flex w-full max-w-[190px] items-center justify-center gap-3 text-left">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.06] ring-1 ring-white/10">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          alt={`${appName} icon`}
+                          className="h-7 w-7 object-contain"
+                          src={collapsedAssetUrl}
+                        />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-white">
+                          {appName}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[11px] leading-4 text-white/55">
+                          {fallbackSubtitle}
+                        </span>
+                      </span>
+                    </span>
+                  )}
                 </span>
               )}
             </SmartNavLink>
@@ -197,11 +221,6 @@ export function Sidebar({
 
             {utilityItems.length > 0 ? (
               <div className={`${collapsed ? "pt-1" : "pt-1.5"}`}>
-                {!collapsed ? (
-                  <p className="mb-1 px-2 text-[9px] font-semibold uppercase tracking-[0.22em] text-white/32">
-                    Settings
-                  </p>
-                ) : null}
                 <div className="space-y-0.5">
                   {utilityItems.map((item) => {
                     const isActive =

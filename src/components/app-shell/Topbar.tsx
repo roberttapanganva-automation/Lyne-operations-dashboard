@@ -3,6 +3,7 @@ import {
 } from "@phosphor-icons/react/ssr";
 import type { CurrentAccountSummary } from "@/lib/account/queries";
 import { presentAuditActivity, buildAuditActivityLookups } from "@/lib/activity/presentation";
+import { getWorkspaceDisplayName } from "@/lib/branding/display";
 import { TopbarTitleBlock } from "@/components/app-shell/TopbarTitleBlock";
 import { TopbarProfileMenu } from "@/components/app-shell/TopbarProfileMenu";
 import { NotificationButton } from "@/components/app-shell/NotificationButton";
@@ -41,7 +42,10 @@ function getGreeting(timezone: string) {
 }
 
 export async function Topbar({ currentAccount, workspaceContext }: TopbarProps) {
-  const appName = workspaceContext.branding?.app_name ?? "OpsPilot";
+  const appName = getWorkspaceDisplayName({
+    branding: workspaceContext.branding,
+    workspaceName: workspaceContext.workspace.name,
+  });
   const account = await currentAccount;
   const displayName = account?.displayName ?? "there";
   const greeting = getGreeting(workspaceContext.workspace.timezone);

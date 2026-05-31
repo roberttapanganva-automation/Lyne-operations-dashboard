@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { UserPreferences } from "@/types/domain";
@@ -347,7 +348,7 @@ export function PreferencesForm({ preferences }: PreferencesFormProps) {
                 In-app notifications
               </span>
               <span className="mt-1 block text-sm text-[var(--ops-text-soft)]">
-                Receive product alerts inside OpsPilot.
+                Receive product alerts inside {DEFAULT_BRAND.appName}.
               </span>
             </span>
             <input

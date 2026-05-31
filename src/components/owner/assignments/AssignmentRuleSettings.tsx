@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type {
@@ -158,7 +159,7 @@ export function AssignmentRuleSettings({
                 Enable auto-assignment for leads
               </span>
               <span className="mt-1 block text-sm text-[var(--ops-text-soft)]">
-                New leads created in OpsPilot will be assigned automatically.
+                New leads created in {DEFAULT_BRAND.appName} will be assigned automatically.
               </span>
             </span>
             <input

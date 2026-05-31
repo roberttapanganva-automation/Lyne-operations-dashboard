@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 
 const themeModeSchema = z.enum(["system", "light", "dark"]);
 
@@ -36,7 +37,7 @@ export const hexColorSchema = z
   .transform(normalizeHexColor)
   .refine(
     (value) => /^#[0-9A-F]{6}$/.test(value),
-    "Use a valid HEX color like #6D5DFC or #6DF.",
+    `Use a valid HEX color like ${DEFAULT_BRAND.primaryColor} or #7CF.`,
   );
 
 export const updateWorkspaceBrandingSchema = z.object({

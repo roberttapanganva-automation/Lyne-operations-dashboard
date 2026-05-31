@@ -1,4 +1,9 @@
 import { buildAuditActivityLookups, presentAuditActivity } from "@/lib/activity/presentation";
+import {
+  formatAutomationEventName,
+  getAutomationSourceLabel,
+  sanitizeAutomationErrorMessage,
+} from "@/lib/automations/presentation";
 import { createClient } from "@/lib/supabase/server";
 import { getPipelinePreviewForDashboard } from "@/lib/pipelines/queries";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
@@ -45,6 +50,8 @@ type AutomationLogRow = {
   error_message: string | null;
   id: string;
   message: string;
+  payload: Record<string, unknown> | null;
+  related_type: string;
   status: "success" | "failed" | "pending" | "skipped" | "retrying";
 };
 
@@ -154,12 +161,18 @@ async function buildActivityItems({
   supabase: Awaited<ReturnType<typeof createClient>>;
 }): Promise<DashboardActivityItem[]> {
   const automationItems = automationLogs.map((log) => ({
+    category:
+      log.automation_type.includes("assigned") ||
+      log.automation_type.includes("assignment")
+        ? "Assignments"
+        : "Automation",
     created_at: log.created_at,
     id: log.id,
     icon: "automation",
-    message: log.error_message ?? log.message,
+    message: sanitizeAutomationErrorMessage(log.error_message) ?? log.message,
+    source: getAutomationSourceLabel(log),
     status: log.status,
-    title: log.automation_type,
+    title: formatAutomationEventName(log.automation_type),
     type: "automation" as const,
   }));
 
@@ -171,7 +184,9 @@ async function buildActivityItems({
       created_at: log.created_at,
       id: log.id,
       icon: presentation.icon,
+      category: presentation.category,
       message: presentation.description,
+      source: "Audit",
       status: null,
       title: presentation.title,
       type: "audit" as const,
@@ -290,7 +305,7 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
       .returns<AppointmentRow[]>(),
     supabase
       .from("automation_logs")
-      .select("id,automation_type,status,message,error_message,created_at")
+      .select("id,automation_type,related_type,status,message,payload,error_message,created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(8)

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --ops-sidebar: #071327;
-  --ops-sidebar-soft: #0d1b33;
+  --ops-sidebar: #0b1020;
+  --ops-sidebar-soft: #11172a;
   --ops-sidebar-card: #13223d;
 
   --ops-main-bg: #f6f8fc;
@@ -17,10 +17,10 @@
   --ops-text-muted: #94a3b8;
   --ops-white: #ffffff;
 
-  --ops-primary: #6d5dfc;
-  --ops-primary-dark: #4f46e5;
-  --ops-primary-soft: #ede9fe;
-  --ops-primary-glow: rgba(109, 93, 252, 0.24);
+  --ops-primary: #7c5cff;
+  --ops-primary-dark: #8b7cff;
+  --ops-primary-soft: #f0edff;
+  --ops-primary-glow: rgba(124, 92, 255, 0.24);
 
   --ops-success: #16a34a;
   --ops-success-soft: #dcfce7;
@@ -50,7 +50,7 @@ html[data-theme="dark"] {
   --ops-text-soft: #cbd5e1;
   --ops-text-muted: #94a3b8;
 
-  --ops-primary-soft: rgba(109, 93, 252, 0.18);
+  --ops-primary-soft: rgba(124, 92, 255, 0.18);
   --ops-success-soft: rgba(22, 163, 74, 0.16);
   --ops-warning-soft: rgba(245, 158, 11, 0.16);
   --ops-danger-soft: rgba(239, 68, 68, 0.16);

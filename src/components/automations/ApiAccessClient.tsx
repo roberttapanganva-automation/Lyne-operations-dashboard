@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { copyTextToClipboard } from "@/lib/client/clipboard";
 import { notify } from "@/lib/ui/toast";
 import {
@@ -503,7 +504,7 @@ export function ApiAccessClient({ initialApiKeys }: ApiAccessClientProps) {
         {apiKeys.length === 0 ? (
           <div className="p-5">
             <EmptyState
-              description="Create a key when an automation builder needs to call OpsPilot."
+              description={`Create a key when an automation builder needs to call ${DEFAULT_BRAND.appName}.`}
               title="No API keys yet"
             />
           </div>

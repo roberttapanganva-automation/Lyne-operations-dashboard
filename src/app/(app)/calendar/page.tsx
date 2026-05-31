@@ -1,22 +1,33 @@
-import { CalendarList } from "@/components/calendar/CalendarList";
-import { AddAppointmentDialog } from "@/components/calendar/AddAppointmentDialog";
-import {
-  CalendarToolbar,
-  type CalendarFilter,
-} from "@/components/calendar/CalendarToolbar";
 import { Card } from "@/components/ui/Card";
-import { getAppointmentsForActiveWorkspace } from "@/lib/appointments/queries";
+import { CalendarWorkspaceView } from "@/components/calendar/CalendarWorkspaceView";
+import {
+  canCreateCalendarRecords,
+  getCalendarMonthData,
+  getVisibleAppointmentsForCalendarList,
+} from "@/lib/calendar/queries";
+import type {
+  CalendarPageTab,
+  CalendarViewMode,
+} from "@/lib/calendar/types";
+import { normalizeDateKey, normalizeYearMonth } from "@/lib/calendar/utils";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
 import {
-  canCreateOperationalRecords,
+  canAssignOperationalRecords,
   canDeleteOperationalRecords,
+  canEditOperationalRecords,
 } from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 
+type CalendarFilter = "today" | "upcoming" | "completed";
+
 type CalendarPageProps = {
   searchParams: Promise<{
+    date?: string;
     filter?: string;
+    month?: string;
+    tab?: string;
+    view?: string;
   }>;
 };
 
@@ -25,104 +36,96 @@ function getCalendarFilter(value: string | undefined): CalendarFilter {
     return value;
   }
 
-  return "today";
+  return "upcoming";
 }
 
-function getDateKey(value: string, timezone: string) {
-  try {
-    return new Intl.DateTimeFormat("en-CA", {
-      day: "2-digit",
-      month: "2-digit",
-      timeZone: timezone,
-      year: "numeric",
-    }).format(new Date(value));
-  } catch {
-    return new Intl.DateTimeFormat("en-CA", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }).format(new Date(value));
+function getCalendarTab(value: string | undefined): CalendarPageTab {
+  if (value === "list" || value === "settings") {
+    return value;
   }
+
+  return "calendar";
 }
 
-function filterAppointments(
-  appointments: Awaited<ReturnType<typeof getAppointmentsForActiveWorkspace>>,
-  activeFilter: CalendarFilter,
-  timezone: string,
-) {
-  const now = new Date();
-  const todayKey = getDateKey(now.toISOString(), timezone);
-
-  if (activeFilter === "today") {
-    return appointments.filter(
-      (appointment) =>
-        appointment.status !== "cancelled" &&
-        getDateKey(appointment.starts_at, timezone) === todayKey,
-    );
+function getCalendarViewMode(value: string | undefined): CalendarViewMode {
+  if (value === "month") {
+    return value;
   }
 
-  if (activeFilter === "completed") {
-    return appointments.filter(
-      (appointment) => appointment.status === "completed",
-    );
-  }
-
-  return appointments.filter(
-    (appointment) =>
-      appointment.status !== "completed" &&
-      appointment.status !== "cancelled" &&
-      new Date(appointment.starts_at).getTime() >= now.getTime(),
-  );
+  return "month";
 }
 
 export default async function CalendarPage({ searchParams }: CalendarPageProps) {
   const params = await searchParams;
+  const activeTab = getCalendarTab(params.tab);
   const activeFilter = getCalendarFilter(params.filter);
+  const activeMonth = normalizeYearMonth(params.month);
+  const activeViewMode = getCalendarViewMode(params.view);
+  const activeDateKey = normalizeDateKey(params.date, activeMonth);
   const activeWorkspace = await getActiveWorkspace();
   const supabase = await createClient();
-  const appointments = await getAppointmentsForActiveWorkspace();
-  const rolePermission =
-    activeWorkspace.status === "ready"
-      ? await getEffectiveRolePermission({
-          role: activeWorkspace.context.role,
-          supabase,
-          workspaceId: activeWorkspace.context.workspace.id,
-        })
-      : null;
-  const canCreateRecords =
-    activeWorkspace.status === "ready" &&
-    canCreateOperationalRecords(activeWorkspace.context.role) &&
-    rolePermission?.can_create_appointments !== false;
-  const canDeleteRecords =
-    activeWorkspace.status === "ready" &&
-    canDeleteOperationalRecords(activeWorkspace.context.role);
-  const timezone =
-    activeWorkspace.status === "ready"
-      ? activeWorkspace.context.workspace.timezone
-      : "UTC";
-  const filteredAppointments = filterAppointments(
-    appointments,
-    activeFilter,
-    timezone,
-  );
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (activeWorkspace.status !== "ready" || !user) {
+    return (
+      <Card className="p-5 sm:p-6">
+        <h2 className="text-lg font-semibold text-[var(--ops-text)]">
+          Calendar unavailable
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-[var(--ops-text-soft)]">
+          We could not resolve an active workspace for this calendar view right now.
+        </p>
+      </Card>
+    );
+  }
+
+  const rolePermission = await getEffectiveRolePermission({
+    role: activeWorkspace.context.role,
+    supabase,
+    workspaceId: activeWorkspace.context.workspace.id,
+  });
+  const monthData = await getCalendarMonthData({
+    activeWorkspace: activeWorkspace.context,
+    currentUserId: user.id,
+    dateKey: activeDateKey,
+    supabase,
+    viewMode: activeViewMode,
+    yearMonth: activeMonth,
+  });
+  const listAppointments = await getVisibleAppointmentsForCalendarList({
+    activeWorkspace: activeWorkspace.context,
+    currentUserId: user.id,
+    supabase,
+  });
+  const canCreateRecords = canCreateCalendarRecords({
+    role: activeWorkspace.context.role,
+    rolePermission,
+  });
+  const canDeleteRecords = canDeleteOperationalRecords(activeWorkspace.context.role);
+  const canEditRecords = canEditOperationalRecords(activeWorkspace.context.role);
+  const canAssignJobs = canAssignOperationalRecords(activeWorkspace.context.role);
+  const canFilterMembers =
+    activeWorkspace.context.role === "owner" ||
+    activeWorkspace.context.role === "admin" ||
+    activeWorkspace.context.role === "manager";
 
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <CalendarToolbar activeFilter={activeFilter} />
-        </div>
-        {canCreateRecords ? (
-          <AddAppointmentDialog className="h-9 w-full shrink-0 sm:w-auto" />
-        ) : null}
-      </div>
-      <Card className="overflow-hidden">
-        <CalendarList
-          appointments={filteredAppointments}
-          canCreateRecords={canCreateRecords}
-          canDeleteRecords={canDeleteRecords}
-        />
-      </Card>
-    </div>
+    <CalendarWorkspaceView
+      activeDateKey={activeDateKey}
+      activeFilter={activeFilter}
+      activeMonth={activeMonth}
+      activeTab={activeTab}
+      activeViewMode={activeViewMode}
+      canAssignJobs={canAssignJobs}
+      canCreateRecords={canCreateRecords}
+      canDeleteRecords={canDeleteRecords}
+      canEditRecords={canEditRecords}
+      canFilterMembers={canFilterMembers}
+      listAppointments={listAppointments}
+      monthData={monthData}
+      timezone={activeWorkspace.context.workspace.timezone}
+    />
   );
 }

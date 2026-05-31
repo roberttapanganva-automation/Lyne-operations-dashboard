@@ -685,14 +685,16 @@ export function ContactsPanel({
             </div>
           </div>
 
-          <BulkActionBar
-            canDelete={canDeleteRecords}
-            canEdit={false}
-            entityLabel="contact"
-            onClearSelection={clearSelection}
-            onDelete={() => setBulkDeleteOpen(true)}
-            selectedCount={visibleSelectedIds.length}
-          />
+          {canDeleteRecords ? (
+            <BulkActionBar
+              canDelete
+              canEdit={false}
+              entityLabel="contact"
+              onClearSelection={clearSelection}
+              onDelete={() => setBulkDeleteOpen(true)}
+              selectedCount={visibleSelectedIds.length}
+            />
+          ) : null}
           {bulkDeleteError ? (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--ops-danger)]">
               {bulkDeleteError}
@@ -732,15 +734,17 @@ export function ContactsPanel({
             <table className="min-w-full text-left text-sm">
               <thead className="sticky top-0 z-0 bg-[var(--ops-card-soft)] text-xs font-semibold uppercase text-[var(--ops-text-muted)]">
                 <tr>
-                  <th className="px-5 py-3 sm:px-6" scope="col">
-                    <input
-                      aria-label="Select all contacts"
-                      checked={allFilteredSelected}
-                      className="h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
-                      onChange={toggleSelectAll}
-                      type="checkbox"
-                    />
-                  </th>
+                  {canDeleteRecords ? (
+                    <th className="px-5 py-3 sm:px-6" scope="col">
+                      <input
+                        aria-label="Select all contacts"
+                        checked={allFilteredSelected}
+                        className="h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                        onChange={toggleSelectAll}
+                        type="checkbox"
+                      />
+                    </th>
+                  ) : null}
                   <th className="px-5 py-3" scope="col">
                     Contact name
                   </th>
@@ -784,17 +788,19 @@ export function ContactsPanel({
                     onDoubleClick={() => openContactEditor(client)}
                     title={canCreateRecords ? "Double-click to edit contact" : undefined}
                   >
-                    <td className="px-5 py-4 sm:px-6">
-                      <input
-                        aria-label={`Select ${client.name}`}
-                        checked={selectedIds.includes(client.id)}
-                        className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
-                        onChange={() => toggleClientSelection(client.id)}
-                        onClick={(event) => event.stopPropagation()}
-                        onDoubleClick={(event) => event.stopPropagation()}
-                        type="checkbox"
-                      />
-                    </td>
+                    {canDeleteRecords ? (
+                      <td className="px-5 py-4 sm:px-6">
+                        <input
+                          aria-label={`Select ${client.name}`}
+                          checked={selectedIds.includes(client.id)}
+                          className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                          onChange={() => toggleClientSelection(client.id)}
+                          onClick={(event) => event.stopPropagation()}
+                          onDoubleClick={(event) => event.stopPropagation()}
+                          type="checkbox"
+                        />
+                      </td>
+                    ) : null}
                     <td className="px-5 py-4">
                       <div className="flex items-start gap-3">
                         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--workspace-primary-soft,var(--ops-primary-soft))] text-sm font-semibold text-[var(--workspace-primary,var(--ops-primary-dark))]">
@@ -877,15 +883,17 @@ export function ContactsPanel({
                       </p>
                     </div>
                   </div>
-                  <input
-                    aria-label={`Select ${client.name}`}
-                    checked={selectedIds.includes(client.id)}
-                    className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
-                    onChange={() => toggleClientSelection(client.id)}
-                    onClick={(event) => event.stopPropagation()}
-                    onDoubleClick={(event) => event.stopPropagation()}
-                    type="checkbox"
-                  />
+                  {canDeleteRecords ? (
+                    <input
+                      aria-label={`Select ${client.name}`}
+                      checked={selectedIds.includes(client.id)}
+                      className="mt-1 h-4 w-4 rounded border-[var(--ops-border)] text-[var(--workspace-primary,var(--ops-primary))] focus:ring-[var(--workspace-primary,var(--ops-primary))]"
+                      onChange={() => toggleClientSelection(client.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      onDoubleClick={(event) => event.stopPropagation()}
+                      type="checkbox"
+                    />
+                  ) : null}
                 </div>
 
                 <div className="grid gap-3 text-sm text-[var(--ops-text-soft)]">

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { PipelineStage } from "@/types/domain";
@@ -125,7 +126,7 @@ function StageRow({
               disabled={disabled}
               onChange={(event) => setColor(normalizeHexColor(event.target.value))}
               type="color"
-              value={isHexColor(color) ? normalizeHexColor(color) : "#6D5DFC"}
+              value={isHexColor(color) ? normalizeHexColor(color) : DEFAULT_BRAND.primaryColor}
             />
           </div>
         </div>
@@ -201,7 +202,7 @@ function AddStageForm({
   ) => Promise<boolean>;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [color, setColor] = useState("#6D5DFC");
+  const [color, setColor] = useState<string>(DEFAULT_BRAND.primaryColor);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -209,7 +210,7 @@ function AddStageForm({
     const didCreate = await onAdd(event.currentTarget, entityType);
     if (didCreate) {
       event.currentTarget.reset();
-      setColor("#6D5DFC");
+      setColor(DEFAULT_BRAND.primaryColor);
     }
     setIsSubmitting(false);
   }
@@ -256,7 +257,7 @@ function AddStageForm({
             className="h-6 w-8 cursor-pointer appearance-none rounded border border-[var(--ops-border)] bg-transparent p-0"
             onChange={(event) => setColor(normalizeHexColor(event.target.value))}
             type="color"
-            value={isHexColor(color) ? normalizeHexColor(color) : "#6D5DFC"}
+            value={isHexColor(color) ? normalizeHexColor(color) : DEFAULT_BRAND.primaryColor}
           />
         </div>
         <input
