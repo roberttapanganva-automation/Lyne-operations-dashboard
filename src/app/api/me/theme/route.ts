@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateAccountPages } from "@/lib/cache/revalidate-app";
 import { ZodError } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getThemePreference } from "@/lib/theme/getThemePreference";
@@ -80,6 +81,8 @@ export async function PATCH(request: Request) {
         500,
       );
     }
+
+    revalidateAccountPages();
 
     const preference = await getThemePreference();
 

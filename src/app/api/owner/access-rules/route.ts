@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getOwnerAccessContext, writeOwnerAuditLog } from "@/lib/owner/access";
 import { defaultRolePermissions } from "@/lib/owner/queries";
+import {
+  buildRolePermissionWritePayload,
+  listWorkspaceRolePermissionRecords,
+} from "@/lib/permissions/rolePermissions";
 import { getAssignableRoles } from "@/lib/permissions/workspace";
 import { updateWorkspaceRolePermissionSchema } from "@/lib/validation/owner";
 import type { ApiResponse } from "@/types/api";
-import type { WorkspaceRolePermission } from "@/types/domain";
-
-const permissionSelect =
-  "id,workspace_id,role,can_view_settings,can_edit_basic_settings,can_edit_branding,can_manage_modules,can_manage_pipeline,can_create_leads,can_create_jobs,can_create_tasks,can_create_appointments,can_view_audit_logs,created_at,updated_at";
 
 function jsonResponse<T>(body: ApiResponse<T>, status = 200) {
   return NextResponse.json(body, { status });
@@ -20,11 +20,8 @@ async function ensurePermissions(
   },
 ) {
   const workspaceId = access.activeWorkspace.workspace.id;
-  const { data, error } = await access.supabase
-    .from("workspace_role_permissions")
-    .select(permissionSelect)
-    .eq("workspace_id", workspaceId)
-    .returns<WorkspaceRolePermission[]>();
+  const { data, error, supportsAutomationsPermission } =
+    await listWorkspaceRolePermissionRecords(access.supabase, workspaceId);
 
   if (error) {
     throw new Error(error.message);
@@ -33,10 +30,15 @@ async function ensurePermissions(
   const existing = new Set((data ?? []).map((permission) => permission.role));
   const missing = getAssignableRoles()
     .filter((role) => !existing.has(role))
-    .map((role) => ({
-      ...defaultRolePermissions[role],
-      workspace_id: workspaceId,
-    }));
+    .map((role) =>
+      buildRolePermissionWritePayload(
+        {
+          ...defaultRolePermissions[role],
+          workspace_id: workspaceId,
+        },
+        supportsAutomationsPermission,
+      ),
+    );
 
   if (missing.length > 0) {
     const { error: insertError } = await access.supabase
@@ -48,12 +50,8 @@ async function ensurePermissions(
     }
   }
 
-  const { data: refreshed, error: refreshedError } = await access.supabase
-    .from("workspace_role_permissions")
-    .select(permissionSelect)
-    .eq("workspace_id", workspaceId)
-    .order("role", { ascending: true })
-    .returns<WorkspaceRolePermission[]>();
+  const { data: refreshed, error: refreshedError } =
+    await listWorkspaceRolePermissionRecords(access.supabase, workspaceId);
 
   if (refreshedError) {
     throw new Error(refreshedError.message);
@@ -115,15 +113,26 @@ export async function PATCH(request: Request) {
     const payload = updateWorkspaceRolePermissionSchema.parse(
       await request.json(),
     );
+    const permissionState = await listWorkspaceRolePermissionRecords(
+      access.supabase,
+      access.activeWorkspace.workspace.id,
+    );
+
+    if (permissionState.error) {
+      throw new Error(permissionState.error.message);
+    }
 
     for (const permission of payload.permissions) {
       const { error } = await access.supabase
         .from("workspace_role_permissions")
         .upsert(
-          {
-            ...permission,
-            workspace_id: access.activeWorkspace.workspace.id,
-          },
+          buildRolePermissionWritePayload(
+            {
+              ...permission,
+              workspace_id: access.activeWorkspace.workspace.id,
+            },
+            permissionState.supportsAutomationsPermission,
+          ),
           { onConflict: "workspace_id,role" },
         );
 

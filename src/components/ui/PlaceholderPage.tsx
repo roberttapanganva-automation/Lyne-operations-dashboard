@@ -1,5 +1,6 @@
 import { Card } from "./Card";
 import { EmptyState } from "./EmptyState";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 
 type PlaceholderPageProps = {
   title: string;
@@ -10,7 +11,7 @@ export function PlaceholderPage({ title, description }: PlaceholderPageProps) {
   return (
     <Card className="p-6">
       <p className="text-sm font-medium text-[var(--ops-primary-dark)]">
-        OpsPilot foundation
+        {DEFAULT_BRAND.appName} foundation
       </p>
       <h2 className="mt-2 text-2xl font-semibold text-[var(--ops-text)]">
         {title}

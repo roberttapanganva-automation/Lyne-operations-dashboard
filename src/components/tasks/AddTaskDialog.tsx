@@ -1,34 +1,43 @@
 "use client";
 
 import { CheckSquareIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { AssignmentMemberField } from "@/components/assignments/AssignmentMemberField";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
+import type { TaskListItem } from "./TasksList";
 
 type AddTaskDialogProps = {
+  canAssignRecords?: boolean;
   className?: string;
+  onTaskCreated?: (task: TaskListItem) => void;
   variant?: "primary" | "secondary" | "ghost";
 };
 
-type CreatedTask = {
-  id: string;
-};
-
-function getErrorMessage(response: ApiResponse<CreatedTask>) {
-  if (response.ok) {
-    return null;
-  }
-
-  return response.error.message;
-}
+type CreatedTask = Pick<
+  TaskListItem,
+  | "assigned_member"
+  | "assigned_member_id"
+  | "completed_at"
+  | "created_at"
+  | "description"
+  | "due_at"
+  | "id"
+  | "priority"
+  | "related_id"
+  | "related_type"
+  | "status"
+  | "title"
+>;
 
 export function AddTaskDialog({
+  canAssignRecords = false,
   className = "",
+  onTaskCreated,
   variant = "primary",
 }: AddTaskDialogProps) {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,6 +69,9 @@ export function AddTaskDialog({
       dueDateValue && dueTime ? `${dueDateValue}T${dueTime}` : "";
 
     const payload = {
+      assigned_member_id: canAssignRecords
+        ? String(formData.get("assigned_member_id") ?? "") || null
+        : undefined,
       description: String(formData.get("description") ?? ""),
       due_at: dueAt ? new Date(dueAt).toISOString() : undefined,
       priority: String(formData.get("priority") ?? "normal"),
@@ -77,24 +89,45 @@ export function AddTaskDialog({
         method: "POST",
       });
       const result = (await response.json()) as ApiResponse<CreatedTask>;
-      const message = getErrorMessage(result);
 
-      if (!response.ok || message) {
-        setError(message ?? "We could not create the task. Please try again.");
+      if (!response.ok || !result.ok) {
+        const errorMessage =
+          result.ok
+            ? "We could not create the task. Please try again."
+            : result.error.message;
+        setError(errorMessage);
+        notify.error("Task could not be added", errorMessage);
         return;
       }
+
+      const createdTask = result.data;
 
       formRef.current?.reset();
       setDueDate(undefined);
       setDueTime("");
       setIsOpen(false);
-      router.refresh();
+      onTaskCreated?.({
+        assigned_member: createdTask.assigned_member ?? null,
+        assigned_member_id: createdTask.assigned_member_id ?? null,
+        completed_at: createdTask.completed_at,
+        created_at: createdTask.created_at,
+        description: createdTask.description,
+        due_at: createdTask.due_at,
+        id: createdTask.id,
+        priority: createdTask.priority,
+        related_id: createdTask.related_id,
+        related_type: createdTask.related_type,
+        status: createdTask.status,
+        title: createdTask.title,
+      });
+      notify.success("Task added", "The task was added to your workspace.");
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not create the task. Please try again.",
-      );
+          : "We could not create the task. Please try again.";
+      setError(errorMessage);
+      notify.error("Task could not be added", errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -120,7 +153,7 @@ export function AddTaskDialog({
           role="dialog"
         >
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[var(--ops-border)] bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-[var(--ops-border)] px-5 py-4 sm:px-6">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--ops-border)] bg-white/95 px-5 py-4 backdrop-blur-sm sm:px-6">
               <div className="flex gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--ops-primary-soft)] text-[var(--ops-primary-dark)]">
                   <CheckSquareIcon
@@ -143,7 +176,7 @@ export function AddTaskDialog({
               </div>
               <button
                 aria-label="Close add task dialog"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--ops-text-soft)] transition hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--ops-danger-soft)] bg-[var(--ops-danger-soft)]/45 text-[var(--ops-danger)] transition hover:bg-[var(--ops-danger-soft)] hover:text-[var(--ops-danger)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-danger)]"
                 disabled={isSubmitting}
                 onClick={closeDialog}
                 type="button"
@@ -185,14 +218,14 @@ export function AddTaskDialog({
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
+                <div className="sm:col-span-2">
                   <label
                     className="text-sm font-medium text-[var(--ops-text)]"
                     htmlFor="task-due-at-time"
                   >
                     Due date/time
                   </label>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_130px]">
+                  <div className="mt-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
                     <DatePicker
                       aria-label="Task due date"
                       clearable
@@ -274,6 +307,14 @@ export function AddTaskDialog({
                     <option value="client">Client</option>
                   </select>
                 </div>
+
+                {canAssignRecords ? (
+                  <AssignmentMemberField
+                    canAssign={canAssignRecords}
+                    disabled={isSubmitting}
+                    id="task-assigned-member"
+                  />
+                ) : null}
               </div>
 
               <div>
@@ -302,7 +343,7 @@ export function AddTaskDialog({
                   Cancel
                 </Button>
                 <Button disabled={isSubmitting} type="submit">
-                  {isSubmitting ? "Creating..." : "Create task"}
+                  {isSubmitting ? "Adding..." : "Add task"}
                 </Button>
               </div>
             </form>

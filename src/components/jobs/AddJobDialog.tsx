@@ -1,38 +1,63 @@
 "use client";
 
 import { BriefcaseIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { AssignmentMemberField } from "@/components/assignments/AssignmentMemberField";
 import {
   DateTimeRangePicker,
   getDateTimeRangeError,
   type DateTimeRangeValue,
 } from "@/components/ui/DateTimeRangePicker";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
+import type { JobListItem } from "./JobsList";
 
 type AddJobDialogProps = {
+  canAssignRecords?: boolean;
   className?: string;
+  onJobCreated?: (job: JobListItem) => void;
   variant?: "primary" | "secondary" | "ghost";
 };
 
-type CreatedJob = {
-  id: string;
+type CreatedJob = Omit<
+  JobListItem,
+  "assigned_member" | "assigned_member_id" | "client" | "estimated_value"
+> & {
+  assigned_member?: JobListItem["assigned_member"];
+  assigned_member_id?: string | null;
+  clients: JobListItem["client"];
+  estimated_value: number | string;
 };
 
-function getErrorMessage(response: ApiResponse<CreatedJob>) {
-  if (response.ok) {
-    return null;
-  }
-
-  return response.error.message;
+function normalizeJob(job: CreatedJob): JobListItem {
+  return {
+    assigned_member: job.assigned_member ?? null,
+    assigned_member_id: job.assigned_member_id ?? null,
+    client: job.clients,
+    client_id: job.client_id,
+    created_at: job.created_at,
+    estimated_value:
+      typeof job.estimated_value === "number"
+        ? job.estimated_value
+        : Number(job.estimated_value),
+    id: job.id,
+    location: job.location,
+    payment_status: job.payment_status,
+    scheduled_end: job.scheduled_end,
+    scheduled_start: job.scheduled_start,
+    service_type: job.service_type,
+    status: job.status,
+    title: job.title,
+  };
 }
 
 export function AddJobDialog({
+  canAssignRecords = false,
   className = "",
+  onJobCreated,
   variant = "primary",
 }: AddJobDialogProps) {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,6 +87,7 @@ export function AddJobDialog({
 
     if (nextScheduleError) {
       setScheduleError(nextScheduleError);
+      notify.warning("Check the job schedule", nextScheduleError);
       return;
     }
 
@@ -71,6 +97,9 @@ export function AddJobDialog({
     const estimatedValue = String(formData.get("estimated_value") ?? "");
 
     const payload = {
+      assigned_member_id: canAssignRecords
+        ? String(formData.get("assigned_member_id") ?? "") || null
+        : undefined,
       client_email: String(formData.get("client_email") ?? ""),
       client_name: String(formData.get("client_name") ?? ""),
       client_phone: String(formData.get("client_phone") ?? ""),
@@ -94,23 +123,31 @@ export function AddJobDialog({
         method: "POST",
       });
       const result = (await response.json()) as ApiResponse<CreatedJob>;
-      const message = getErrorMessage(result);
 
-      if (!response.ok || message) {
-        setError(message ?? "We could not create the job. Please try again.");
+      if (!response.ok || !result.ok) {
+        const errorMessage =
+          result.ok
+            ? "We could not create the job. Please try again."
+            : result.error.message;
+        setError(errorMessage);
+        notify.error("Job could not be added", errorMessage);
         return;
       }
+
+      const createdJob = result.data;
 
       formRef.current?.reset();
       setSchedule({ end: null, start: null });
       setIsOpen(false);
-      router.refresh();
+      onJobCreated?.(normalizeJob(createdJob));
+      notify.success("Job added", "The job was added to the board.");
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not create the job. Please try again.",
-      );
+          : "We could not create the job. Please try again.";
+      setError(errorMessage);
+      notify.error("Job could not be added", errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -136,7 +173,7 @@ export function AddJobDialog({
           role="dialog"
         >
           <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-[var(--ops-border)] bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-[var(--ops-border)] px-5 py-4 sm:px-6">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--ops-border)] bg-white/95 px-5 py-4 backdrop-blur-sm sm:px-6">
               <div className="flex gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--ops-primary-soft)] text-[var(--ops-primary-dark)]">
                   <BriefcaseIcon aria-hidden="true" size={22} weight="duotone" />
@@ -155,7 +192,7 @@ export function AddJobDialog({
               </div>
               <button
                 aria-label="Close add job dialog"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--ops-text-soft)] transition hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--ops-danger-soft)] bg-[var(--ops-danger-soft)]/45 text-[var(--ops-danger)] transition hover:bg-[var(--ops-danger-soft)] hover:text-[var(--ops-danger)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-danger)]"
                 disabled={isSubmitting}
                 onClick={closeDialog}
                 type="button"
@@ -354,6 +391,14 @@ export function AddJobDialog({
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
+
+                {canAssignRecords ? (
+                  <AssignmentMemberField
+                    canAssign={canAssignRecords}
+                    disabled={isSubmitting}
+                    id="job-assigned-member"
+                  />
+                ) : null}
               </div>
 
               <div>
@@ -382,7 +427,7 @@ export function AddJobDialog({
                   Cancel
                 </Button>
                 <Button disabled={isSubmitting} type="submit">
-                  {isSubmitting ? "Creating..." : "Create job"}
+                  {isSubmitting ? "Adding..." : "Add job"}
                 </Button>
               </div>
             </form>

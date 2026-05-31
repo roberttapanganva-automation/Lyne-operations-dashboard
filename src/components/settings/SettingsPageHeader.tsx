@@ -22,11 +22,12 @@ export function SettingsPageHeader({
               Settings
             </h1>
             <Badge variant={canManageSettings ? "success" : "warning"}>
-              {canManageSettings ? "Editable" : "Read only"}
+              {canManageSettings ? "Owner controls" : "Personal access"}
             </Badge>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ops-text-soft)]">
-            Manage workspace profile, branding, modules, and pipeline setup.
+            Review your account context and personal preferences. Workspace-wide
+            controls stay in Owner Console.
           </p>
         </div>
       </div>

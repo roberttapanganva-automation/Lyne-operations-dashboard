@@ -10,6 +10,7 @@ import {
   ShieldCheckIcon,
   SlidersHorizontalIcon,
   SquaresFourIcon,
+  TargetIcon,
   UsersThreeIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
@@ -26,6 +27,7 @@ const ownerNavItems = [
   { href: "/owner/branding", label: "Branding", Icon: PaintBrushIcon },
   { href: "/owner/modules", label: "Modules", Icon: SlidersHorizontalIcon },
   { href: "/owner/pipeline", label: "Pipeline", Icon: ListChecksIcon },
+  { href: "/owner/assignments", label: "Assignments", Icon: TargetIcon },
   { href: "/owner/access-rules", label: "Access Rules", Icon: ShieldCheckIcon },
   { href: "/owner/audit-logs", label: "Audit Logs", Icon: GearSixIcon },
 ] as const;
@@ -55,7 +57,6 @@ export function OwnerConsoleShell({
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">
             Owner Console
           </p>
-          <p className="mt-2 truncate text-sm text-white/50">{appName}</p>
         </div>
 
         <nav className="mt-8 flex flex-1 flex-col gap-1" aria-label="Owner">

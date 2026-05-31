@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 import {
-  canManageWorkspaceSettings,
   getDefaultRolePermission,
 } from "@/lib/permissions/workspace";
 import type { User } from "@supabase/supabase-js";
@@ -95,6 +94,7 @@ export async function getSettingsAccessContext(): Promise<SettingsAccessResult> 
   }
 
   let rolePermissions: WorkspaceRolePermission | null = null;
+  let explicitRolePermissions: WorkspaceRolePermission | null = null;
 
   if (member.role !== "owner") {
     const { data: permissions } = await supabase
@@ -106,28 +106,28 @@ export async function getSettingsAccessContext(): Promise<SettingsAccessResult> 
       .eq("role", member.role)
       .maybeSingle<WorkspaceRolePermission>();
 
+    explicitRolePermissions = permissions ?? null;
     rolePermissions = permissions ?? getDefaultRolePermission(member.role);
   }
 
-  const ownerOrAdmin = canManageWorkspaceSettings(member.role);
   const canViewSettings =
     member.role === "owner" ||
-    ownerOrAdmin ||
     rolePermissions?.can_view_settings === true;
   const canManageSettings =
     member.role === "owner" ||
-    rolePermissions?.can_edit_basic_settings === true;
+    explicitRolePermissions?.can_edit_basic_settings === true;
 
   return {
     activeWorkspace: activeWorkspace.context,
     canManageBranding:
       member.role === "owner" ||
-      member.role === "admin" ||
-      rolePermissions?.can_edit_branding === true,
+      explicitRolePermissions?.can_edit_branding === true,
     canManageModules:
-      member.role === "owner" || rolePermissions?.can_manage_modules === true,
+      member.role === "owner" ||
+      explicitRolePermissions?.can_manage_modules === true,
     canManagePipeline:
-      member.role === "owner" || rolePermissions?.can_manage_pipeline === true,
+      member.role === "owner" ||
+      explicitRolePermissions?.can_manage_pipeline === true,
     canManageSettings,
     canViewSettings,
     role: member.role,

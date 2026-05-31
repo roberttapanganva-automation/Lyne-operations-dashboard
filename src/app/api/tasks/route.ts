@@ -1,13 +1,24 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { revalidateTaskPages } from "@/lib/cache/revalidate-app";
 import { ZodError } from "zod";
+import {
+  getAssignableMember,
+  getAssignmentFields,
+} from "@/lib/assignments/engine";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
-import { canCreateOperationalRecords } from "@/lib/permissions/workspace";
+import {
+  canAssignOperationalRecords,
+  canCreateOperationalRecords,
+} from "@/lib/permissions/workspace";
+import { triggerAutomationForWorkspace } from "@/lib/n8n/client";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 import { createTaskSchema } from "@/lib/validation/tasks";
 import type { ApiResponse } from "@/types/api";
+import type { AssignableWorkspaceMember } from "@/types/domain";
 
 type TaskResponse = {
+  assigned_member_id: string | null;
   completed_at: string | null;
   created_at: string;
   description: string | null;
@@ -113,7 +124,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("tasks")
     .select(
-      "id,title,description,due_at,priority,status,related_type,related_id,completed_at,created_at",
+      "id,assigned_member_id,title,description,due_at,priority,status,related_type,related_id,completed_at,created_at",
     )
     .eq("workspace_id", activeWorkspace.context.workspace.id)
     .order("created_at", { ascending: false })
@@ -201,6 +212,8 @@ export async function POST(request: Request) {
   try {
     const payload = createTaskSchema.parse(await request.json());
     const workspaceId = activeWorkspace.context.workspace.id;
+    const requestedAssignedMemberId = payload.assigned_member_id ?? null;
+    let assignedMember: AssignableWorkspaceMember | null = null;
     const relatedRecordIsValid = await verifyRelatedRecord({
       relatedId: payload.related_id,
       relatedType: payload.related_type,
@@ -222,9 +235,49 @@ export async function POST(request: Request) {
       );
     }
 
+    if (requestedAssignedMemberId) {
+      if (!canAssignOperationalRecords(activeWorkspace.context.role)) {
+        return jsonResponse(
+          {
+            error: {
+              code: "TASK_ASSIGN_FORBIDDEN",
+              message: "Your workspace role cannot assign tasks.",
+            },
+            ok: false,
+          },
+          403,
+        );
+      }
+
+      assignedMember = await getAssignableMember({
+        memberId: requestedAssignedMemberId,
+        supabase,
+        workspaceId,
+      });
+
+      if (!assignedMember) {
+        return jsonResponse(
+          {
+            error: {
+              code: "TASK_ASSIGNEE_INVALID",
+              message:
+                "Choose an active admin, manager, or staff member from this workspace.",
+            },
+            ok: false,
+          },
+          400,
+        );
+      }
+    }
+
     const { data: task, error: taskError } = await supabase
       .from("tasks")
       .insert({
+        ...getAssignmentFields({
+          actorUserId: user.id,
+          assignedMember,
+          targetType: "task",
+        }),
         completed_at: payload.status === "done" ? new Date().toISOString() : null,
         created_by: user.id,
         description: payload.description ?? null,
@@ -238,7 +291,7 @@ export async function POST(request: Request) {
         workspace_id: workspaceId,
       })
       .select(
-        "id,title,description,due_at,priority,status,related_type,related_id,completed_at,created_at",
+        "id,assigned_member_id,title,description,due_at,priority,status,related_type,related_id,completed_at,created_at",
       )
       .single<TaskResponse>();
 
@@ -267,9 +320,29 @@ export async function POST(request: Request) {
       workspace_id: workspaceId,
     });
 
+    revalidateTaskPages();
+
+    if (assignedMember) {
+      after(() =>
+        triggerAutomationForWorkspace({
+          automationType: "task.assigned",
+          payload: {
+            assigned_member_id: assignedMember.id,
+          },
+          relatedId: task.id,
+          relatedType: "task",
+          supabase,
+          workspaceId,
+        }),
+      );
+    }
+
     return jsonResponse(
       {
-        data: task,
+        data: {
+          ...task,
+          assigned_member: assignedMember,
+        },
         ok: true,
       },
       201,

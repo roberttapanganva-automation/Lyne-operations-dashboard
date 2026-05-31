@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import {
   hexColorSchema,
   updateWorkspaceBrandingSchema,
@@ -42,7 +43,7 @@ export const updateWorkspaceModulesSchema = z.object({
 });
 
 export const createPipelineStageSchema = z.object({
-  color: colorSchema.default("#6D5DFC"),
+  color: colorSchema.default(DEFAULT_BRAND.primaryColor),
   entity_type: z.enum(["lead", "job"]),
   is_closed: z.boolean().default(false),
   is_lost: z.boolean().default(false),

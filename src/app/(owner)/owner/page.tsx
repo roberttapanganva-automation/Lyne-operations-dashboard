@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   CheckCircleIcon,
-  ClockCounterClockwiseIcon,
   GearSixIcon,
   ShieldCheckIcon,
   SlidersHorizontalIcon,
@@ -12,6 +11,11 @@ import { DangerZonePlaceholder } from "@/components/owner/DangerZonePlaceholder"
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import {
+  buildAuditActivityLookups,
+  presentAuditActivity,
+} from "@/lib/activity/presentation";
+import { createClient } from "@/lib/supabase/server";
 import { getOwnerConsoleOverview } from "@/lib/owner/queries";
 
 const cards = [
@@ -30,10 +34,16 @@ function formatDate(value: string) {
 
 export default async function OwnerOverviewPage() {
   const overview = await getOwnerConsoleOverview();
+  const supabase = await createClient();
 
   if (!overview) {
     return null;
   }
+
+  const auditLookups = await buildAuditActivityLookups(
+    supabase,
+    overview.latestAuditLogs,
+  );
 
   const setupItems = [
     {
@@ -85,8 +95,7 @@ export default async function OwnerOverviewPage() {
           Workspace ownership controls
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--ops-text-soft)]">
-          Manage team roles, pending invites, workspace controls, access rules,
-          and audit visibility for {overview.workspace.name}.
+          Control workspace branding, roles, permissions, modules, and business-level configuration.
         </p>
       </section>
 
@@ -126,11 +135,15 @@ export default async function OwnerOverviewPage() {
                 Latest real audit events from this workspace.
               </p>
             </div>
-            <ClockCounterClockwiseIcon
-              aria-hidden="true"
-              size={24}
-              weight="duotone"
-            />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--ops-card-soft)] text-[#7B8794]">
+              <svg
+                aria-hidden="true"
+                className="h-6 w-6 fill-current"
+                viewBox="0 0 256 256"
+              >
+                <path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z" />
+              </svg>
+            </div>
           </div>
           {overview.latestAuditLogs.length === 0 ? (
             <div className="mt-5">
@@ -142,17 +155,26 @@ export default async function OwnerOverviewPage() {
           ) : (
             <div className="mt-5 space-y-3">
               {overview.latestAuditLogs.map((log) => (
-                <div
-                  className="rounded-lg border border-[var(--ops-border)] bg-[var(--ops-card-soft)] p-4"
-                  key={log.id}
-                >
-                  <p className="font-semibold text-[var(--ops-text)]">
-                    {log.action}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
-                    {log.entity_type} - {formatDate(log.created_at)}
-                  </p>
-                </div>
+                (() => {
+                  const presentation = presentAuditActivity(log, auditLookups);
+
+                  return (
+                    <div
+                      className="rounded-lg border border-[var(--ops-border)] bg-[var(--ops-card-soft)] p-4"
+                      key={log.id}
+                    >
+                      <p className="font-semibold text-[var(--ops-text)]">
+                        {presentation.title}
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
+                        {presentation.description}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
+                        {formatDate(log.created_at)}
+                      </p>
+                    </div>
+                  );
+                })()
               ))}
             </div>
           )}

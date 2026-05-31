@@ -1,9 +1,10 @@
 import type { CSSProperties } from "react";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import type { WorkspaceBranding } from "@/types/domain";
 import { normalizeHexColor } from "@/lib/validation/branding";
 
-const DEFAULT_PRIMARY = "#6D5DFC";
-const DEFAULT_ACCENT = "#4F46E5";
+const DEFAULT_PRIMARY = DEFAULT_BRAND.primaryColor;
+const DEFAULT_ACCENT = DEFAULT_BRAND.accentColor;
 
 function isValidHexColor(value: string) {
   return /^#[0-9A-F]{6}$/.test(normalizeHexColor(value));

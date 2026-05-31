@@ -36,8 +36,16 @@ export default async function PipelinesPage({
   return (
     <div className="space-y-5 sm:space-y-6">
       <PipelinePageHeader
+        canCreateLeadCards={board.can_create_leads}
         groups={board.groups}
+        selectedGroupEntityType={board.selected_group?.entity_type ?? null}
+        selectedGroupCardCount={board.stages.reduce(
+          (total, stage) => total + stage.card_count,
+          0,
+        )}
         selectedGroupId={board.selected_group?.id ?? null}
+        selectedStageId={board.stages[0]?.id ?? null}
+        selectedStageName={board.stages[0]?.name ?? null}
         showOwnerLink={canAccessOwnerConsole(activeWorkspace.context.role)}
       />
       <PipelineBoard

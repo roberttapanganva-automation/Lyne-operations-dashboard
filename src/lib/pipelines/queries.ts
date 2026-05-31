@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
-import { canManageOperations } from "@/lib/permissions/workspace";
+import { getEffectiveRolePermission } from "@/lib/permissions/effective";
+import {
+  canCreateOperationalRecords,
+  canManageOperations,
+} from "@/lib/permissions/workspace";
 import type {
   DashboardPipelineStageSummary,
   PipelineBoard,
@@ -16,6 +20,12 @@ type PipelineGroupRow = PipelineGroup;
 
 type PipelineStageRow = PipelineStage;
 
+export type LeadPipelineStageOption = {
+  groupName: string;
+  id: string;
+  name: string;
+};
+
 type LeadBoardRow = {
   clients: {
     email: string | null;
@@ -25,6 +35,7 @@ type LeadBoardRow = {
   id: string;
   next_follow_up_at: string | null;
   priority: "low" | "normal" | "high" | "urgent";
+  source: string | null;
   stage_id: string | null;
   status: "open" | "won" | "lost";
   title: string;
@@ -135,6 +146,7 @@ function normalizeLeadCard(row: LeadBoardRow): PipelineBoardCard {
     priority: row.priority,
     scheduled_start: null,
     service_type: null,
+    source: row.source,
     stage_id: row.stage_id,
     status: row.status,
     title: row.title,
@@ -153,6 +165,7 @@ function normalizeJobCard(row: JobBoardRow): PipelineBoardCard {
     priority: null,
     scheduled_start: row.scheduled_start,
     service_type: row.service_type,
+    source: null,
     stage_id: row.stage_id,
     status: row.status,
     title: row.title,
@@ -223,6 +236,68 @@ export async function getPipelineGroupsForActiveWorkspace(): Promise<PipelineGro
   return (data ?? []).sort(byEntityTypeThenOrder);
 }
 
+export async function getLeadPipelineStageOptionsForActiveWorkspace(): Promise<
+  LeadPipelineStageOption[]
+> {
+  const activeWorkspace = await getActiveWorkspace();
+
+  if (activeWorkspace.status !== "ready") {
+    return [];
+  }
+
+  const supabase = await createClient();
+  const workspaceId = activeWorkspace.context.workspace.id;
+  const [{ data: groups, error: groupsError }, { data: stages, error: stagesError }] =
+    await Promise.all([
+      supabase
+        .from("pipeline_groups")
+        .select("id,name,order_index,created_at")
+        .eq("workspace_id", workspaceId)
+        .eq("entity_type", "lead")
+        .order("order_index", { ascending: true })
+        .order("created_at", { ascending: true })
+        .returns<Array<{ created_at: string; id: string; name: string; order_index: number }>>(),
+      supabase
+        .from("pipeline_stages")
+        .select("id,name,pipeline_group_id,order_index,created_at")
+        .eq("workspace_id", workspaceId)
+        .eq("entity_type", "lead")
+        .order("order_index", { ascending: true })
+        .order("created_at", { ascending: true })
+        .returns<
+          Array<{
+            created_at: string;
+            id: string;
+            name: string;
+            order_index: number;
+            pipeline_group_id: string;
+          }>
+        >(),
+    ]);
+
+  if (groupsError || stagesError) {
+    const message = groupsError?.message ?? stagesError?.message;
+
+    if (isPipelineSchemaPendingMessage(message)) {
+      console.warn("Lead pipeline stage options unavailable while migration is pending", {
+        message,
+      });
+
+      return [];
+    }
+
+    throw new Error(message);
+  }
+
+  const groupsById = new Map((groups ?? []).map((group) => [group.id, group.name]));
+
+  return (stages ?? []).map((stage) => ({
+    groupName: groupsById.get(stage.pipeline_group_id) ?? "Lead pipeline",
+    id: stage.id,
+    name: stage.name,
+  }));
+}
+
 export async function getPipelineCardsByStage({
   entityType,
   stageIds,
@@ -242,7 +317,7 @@ export async function getPipelineCardsByStage({
     const { data, error } = await supabase
       .from("leads")
       .select(
-        "id,title,stage_id,estimated_value,priority,next_follow_up_at,status,clients(name,email)",
+        "id,title,stage_id,estimated_value,priority,next_follow_up_at,status,source,clients(name,email)",
       )
       .eq("workspace_id", workspaceId)
       .in("stage_id", stageIds)
@@ -302,6 +377,7 @@ export async function getPipelineBoardForActiveWorkspace(
 
   if (activeWorkspace.status !== "ready") {
     return {
+      can_create_leads: false,
       can_move_cards: false,
       entity_type: null,
       groups: [],
@@ -312,6 +388,15 @@ export async function getPipelineBoardForActiveWorkspace(
 
   const supabase = await createClient();
   const workspaceId = activeWorkspace.context.workspace.id;
+  const rolePermission = await getEffectiveRolePermission({
+    role: activeWorkspace.context.role,
+    supabase,
+    workspaceId,
+  });
+  const canMoveCards = canManageOperations(activeWorkspace.context.role);
+  const canCreateLeads =
+    canCreateOperationalRecords(activeWorkspace.context.role) &&
+    rolePermission?.can_create_leads !== false;
   const { data: groups, error: groupsError } = await supabase
     .from("pipeline_groups")
     .select(
@@ -327,7 +412,8 @@ export async function getPipelineBoardForActiveWorkspace(
       });
 
       return {
-        can_move_cards: canManageOperations(activeWorkspace.context.role),
+        can_create_leads: canCreateLeads,
+        can_move_cards: canMoveCards,
         entity_type: null,
         groups: [],
         selected_group: null,
@@ -343,7 +429,8 @@ export async function getPipelineBoardForActiveWorkspace(
 
   if (!selectedGroup) {
     return {
-      can_move_cards: canManageOperations(activeWorkspace.context.role),
+      can_create_leads: canCreateLeads,
+      can_move_cards: canMoveCards,
       entity_type: null,
       groups: sortedGroups,
       selected_group: null,
@@ -369,7 +456,8 @@ export async function getPipelineBoardForActiveWorkspace(
       });
 
       return {
-        can_move_cards: canManageOperations(activeWorkspace.context.role),
+        can_create_leads: canCreateLeads,
+        can_move_cards: canMoveCards,
         entity_type: selectedGroup.entity_type,
         groups: sortedGroups,
         selected_group: selectedGroup,
@@ -402,7 +490,8 @@ export async function getPipelineBoardForActiveWorkspace(
   });
 
   return {
-    can_move_cards: canManageOperations(activeWorkspace.context.role),
+    can_create_leads: canCreateLeads,
+    can_move_cards: canMoveCards,
     entity_type: selectedGroup.entity_type,
     groups: sortedGroups,
     selected_group: selectedGroup,

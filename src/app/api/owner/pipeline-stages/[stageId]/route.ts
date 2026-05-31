@@ -18,6 +18,18 @@ function jsonResponse<T>(body: ApiResponse<T>, status = 200) {
   return NextResponse.json(body, { status });
 }
 
+async function writePipelineAuditLogSafely(
+  payload: Parameters<typeof writeOwnerAuditLog>[0],
+) {
+  try {
+    await writeOwnerAuditLog(payload);
+  } catch (error) {
+    console.error("Pipeline stage audit log failed", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
+
 async function getStageId(context: RouteContext) {
   const { stageId } = await context.params;
 
@@ -101,7 +113,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    await writeOwnerAuditLog({
+    await writePipelineAuditLogSafely({
       access,
       action: "pipeline_stage.updated",
       entityId: stage.id,
@@ -198,7 +210,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       );
     }
 
-    await writeOwnerAuditLog({
+    await writePipelineAuditLogSafely({
       access,
       action: "pipeline_stage.deleted",
       entityId: stageId,

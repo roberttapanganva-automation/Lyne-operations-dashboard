@@ -1,6 +1,7 @@
 "use client";
 
 import { brandingColorPresets } from "@/lib/branding/colorPresets";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { normalizeHexColor, validateHexColor } from "@/lib/validation/branding";
 
 type BrandingColorPickerProps = {
@@ -134,7 +135,7 @@ export function BrandingColorPicker({
           </div>
           {!primaryIsValid ? (
             <p className="mt-2 text-xs text-[var(--ops-danger)]">
-              Enter a valid HEX value like #6D5DFC.
+              Enter a valid HEX value like {DEFAULT_BRAND.primaryColor}.
             </p>
           ) : null}
         </div>

@@ -21,7 +21,7 @@ export function RevenueOverview({ summary }: RevenueOverviewProps) {
     <Card className="p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <SectionHeader
-          description="Revenue (Est.) uses real job estimates; actual revenue uses completed job actuals."
+          description="Watch projected revenue, scheduled production value, and completed earnings in one operating view."
           title="Revenue Overview"
         />
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--ops-primary-soft)] text-[var(--ops-primary-dark)]">

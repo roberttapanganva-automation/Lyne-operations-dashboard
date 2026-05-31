@@ -63,9 +63,62 @@ export type UserThemePreference = {
   workspaceDefaultThemeMode: ThemeMode;
 };
 
+export type UserPreferences = {
+  date_format: "MMM d, yyyy" | "MM/dd/yyyy" | "dd/MM/yyyy" | "yyyy-MM-dd";
+  default_landing_page:
+    | "/dashboard"
+    | "/leads"
+    | "/jobs"
+    | "/tasks"
+    | "/calendar"
+    | "/pipelines"
+    | "/automations";
+  in_app_notifications_enabled: boolean;
+  reduce_motion: boolean;
+  table_density: "compact" | "comfortable" | "spacious";
+  time_format: "12h" | "24h";
+  timezone: string;
+  week_starts_on: "sunday" | "monday";
+};
+
 export type WorkspaceModuleSettings = WorkspaceModules;
 
 export type PipelineEntityType = "lead" | "job";
+
+export type Client = {
+  address: string | null;
+  company_name: string | null;
+  created_at: string;
+  created_by: string | null;
+  email: string | null;
+  id: string;
+  name: string;
+  notes: string | null;
+  phone: string | null;
+  source: string | null;
+  updated_at: string;
+  updated_by: string | null;
+  workspace_id: string;
+};
+
+export type ClientSummary = Pick<
+  Client,
+  "company_name" | "email" | "id" | "name" | "phone" | "source"
+>;
+
+export type ClientListItem = Client & {
+  completed_job_count: number;
+  last_activity_at: string | null;
+  latest_lead_activity_at: string | null;
+  latest_completed_job_at: string | null;
+  linked_lead_count: number;
+  relationship_label: "Customer" | "Repeat customer" | "Saved contact";
+};
+
+export type LeadWithClient = {
+  client: ClientSummary | null;
+  client_id: string | null;
+};
 
 export type PipelineGroup = {
   created_at: string;
@@ -110,6 +163,7 @@ export type PipelineBoardCard = {
   priority: "low" | "normal" | "high" | "urgent" | null;
   scheduled_start: string | null;
   service_type: string | null;
+  source: string | null;
   stage_id: string | null;
   status: string;
   title: string;
@@ -122,6 +176,7 @@ export type PipelineBoardStage = PipelineStage & {
 };
 
 export type PipelineBoard = {
+  can_create_leads: boolean;
   can_move_cards: boolean;
   entity_type: PipelineEntityType | null;
   groups: PipelineGroup[];
@@ -133,6 +188,59 @@ export type PipelineMoveRequest = {
   entity_type: PipelineEntityType;
   record_id: string;
   target_stage_id: string;
+};
+
+export type AssignmentTargetType = "lead" | "job" | "task";
+
+export type AssignmentRule = {
+  auto_create_task: boolean;
+  created_at: string;
+  created_by: string | null;
+  enabled: boolean;
+  entity_type: AssignmentTargetType;
+  id: string;
+  last_assigned_member_id: string | null;
+  notify_assignee: boolean;
+  strategy: "round_robin";
+  task_due_offset_minutes: number;
+  updated_at: string;
+  updated_by: string | null;
+  workspace_id: string;
+};
+
+export type AssignmentRuleMember = {
+  active: boolean;
+  assignment_rule_id: string;
+  created_at: string;
+  id: string;
+  order_index: number;
+  updated_at: string;
+  workspace_id: string;
+  workspace_member_id: string;
+};
+
+export type AssignableWorkspaceMember = {
+  display_name: string;
+  email: string | null;
+  full_name: string | null;
+  id: string;
+  role: "owner" | "admin" | "manager" | "staff";
+  status: "active";
+  user_id: string;
+  workspace_id: string;
+};
+
+export type AssignmentResult = {
+  assigned_member: AssignableWorkspaceMember | null;
+  assigned_member_id: string | null;
+  auto_created_task_id?: string | null;
+  changed?: boolean;
+  error?: string | null;
+  notify_assignee?: boolean;
+  ok: boolean;
+  record_id: string;
+  target_type: AssignmentTargetType;
+  warning?: string | null;
 };
 
 export type WorkspaceSettingsData = {
@@ -207,6 +315,7 @@ export type WorkspaceRolePermission = {
   can_create_jobs: boolean;
   can_create_leads: boolean;
   can_create_tasks: boolean;
+  can_view_automations: boolean;
   can_edit_basic_settings: boolean;
   can_edit_branding: boolean;
   can_manage_modules: boolean;
@@ -329,12 +438,67 @@ export type DashboardRevenueSummary = {
 };
 
 export type DashboardActivityItem = {
+  category: string;
   created_at: string;
   id: string;
+  icon: string;
   message: string;
+  source: string;
   status: string | null;
   title: string;
   type: "automation" | "audit";
+};
+
+export type AutomationLogStatus =
+  | "success"
+  | "failed"
+  | "pending"
+  | "skipped"
+  | "retrying";
+
+export type AutomationLog = {
+  automation_type: string;
+  created_at: string;
+  error_message: string | null;
+  id: string;
+  message: string;
+  payload: Record<string, unknown> | null;
+  related_id: string | null;
+  related_type: string;
+  status: AutomationLogStatus;
+  workspace_id: string;
+};
+
+export type WorkspaceApiKeyScope = "lead:create" | "automation_logs:read";
+
+export type WorkspaceApiKeyStatus = "active" | "revoked" | "expired";
+
+export type WorkspaceApiKey = {
+  created_at: string;
+  created_by: string | null;
+  expires_at: string | null;
+  id: string;
+  key_prefix: string;
+  key_suffix: string;
+  last_failed_at: string | null;
+  last_used_at: string | null;
+  name: string;
+  revoked_at: string | null;
+  revoked_by: string | null;
+  scopes: WorkspaceApiKeyScope[];
+  status: WorkspaceApiKeyStatus;
+  updated_at: string;
+  workspace_id: string;
+};
+
+export type WorkspaceApiKeyCreateResult = {
+  apiKey: WorkspaceApiKey;
+  rawKey: string;
+};
+
+export type WorkspaceApiKeyVerificationResult = {
+  scopes: WorkspaceApiKeyScope[];
+  workspaceName: string;
 };
 
 export type DashboardOverview = {

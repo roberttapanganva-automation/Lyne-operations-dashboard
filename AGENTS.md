@@ -1,101 +1,80 @@
-# OpsPilot  ServiceOps Command Center — Codex Instructions
+# OpsPilot / ServiceOps Command Center — Codex Instructions
 
 ## Mission
 
-Build OpsPilot, a premium multi-tenant SaaS operations dashboard for service businesses.
+Build and maintain OpsPilot as a premium multi-tenant SaaS operations dashboard for service businesses.
 
-Official stack
-- Next.js App Router
-- TypeScript
-- Tailwind CSS
-- Supabase Auth
-- Supabase Postgres
-- Supabase Row Level Security
-- n8n later
-- OpenAI later
-- Stripe later
-- Vercel
+## Source Of Truth
 
-## Source of Truth
+Read these before changing implementation:
 
-Before making changes, follow these docs in `docs`
-
-1. OpsPilot_ServiceOps_Master_Blueprint_NEXTJS.md
-2. ServiceOps_Command_Center_DB_Blueprint_NEXTJS.md
-3. ServiceOps_Command_Center_UI_Blueprint_NEXTJS.md
-4. ServiceOps_Command_Center_Codex_SKILL_NEXTJS.md
-5. OpsPilot_Codex_Plugins_and_Skills.md
+1. `docs/OpsPilot_ServiceOps_Master_Blueprint_NEXTJS.md`
+2. `docs/ServiceOps_Command_Center_DB_Blueprint_NEXTJS.md`
+3. `docs/ServiceOps_Command_Center_UI_Blueprint_NEXTJS.md`
+4. `docs/ServiceOps_Command_Center_Codex_SKILL_NEXTJS.md`
+5. `docs/OpsPilot_Codex_Plugins_and_Skills.md`
+6. `docs/CURRENT_IMPLEMENTATION_STATUS.md` if present
 
 ## Non-Negotiable Rules
 
-- Use Next.js App Router, not Vite.
-- Do not use React Router.
-- Do not expose secrets in client code.
-- Only `NEXT_PUBLIC_` env vars can be used in browser code.
-- Use Supabase RLS for tenant isolation.
-- Every workspace-owned table must include `workspace_id`.
-- Do not disable RLS to fix errors.
-- Do not hardcode workspace IDs.
-- Do not add fake production data.
-- Use empty states if no data exists.
-- Keep the dark navy sidebar and light main workspace design.
-- Make small safe patches.
-- Run `npm run build` after meaningful changes.
-- Explain every file changed.
+- use Next.js App Router only
+- do not use React Router
+- use Phosphor Icons
+- do not use a service role key for normal app flows
+- only `NEXT_PUBLIC_` variables may reach browser code
+- keep Supabase RLS enabled
+- every workspace-owned table must include `workspace_id`
+- do not disable RLS to fix errors
+- do not accept `workspace_id` from client writes
+- do not hardcode workspace IDs
+- do not add fake data
+- use empty states where data is missing
+- Owner Console is owner-only
+- Settings is personal and role-limited
+- CRM page has `Leads` and `Contacts` tabs
+- dashboard pipeline is preview only
+- `/pipelines` is the full board
+- personal theme preference lives in `profiles.theme_mode`
+- role permissions flow through `workspace_role_permissions`
+- n8n secrets are server-only
+- safe delete requires typing exactly `Delete`
+- use small safe patches
+- explain every file changed
+- always report validation honestly
 
 ## UI Direction
 
-The app should feel like a premium SaaS dashboard
 - dark navy sidebar
-- light workspace
+- light main workspace
+- compact premium operational spacing
 - rounded cards
-- purpleblue accents
-- clean topbar
-- KPI cards
-- pipeline overview
-- today agenda
-- recent activity
-- AI assistant placeholder
-- mobile-friendly layout
+- CRM-style tables
+- pipeline board columns and cards
+- Owner Console separated from daily operations
+- no fake badges, fake counts, or fake records
 
-## Build Order
+## Build Direction
 
 1. Next.js foundation
-2. Design tokens and app shell
-3. Supabase DB foundation
-4. Supabase auth
-5. Workspace loading
-6. Dashboard UI
-7. Leads CRUD
-8. Jobs CRUD
-9. Tasks CRUD
-10. Dashboard real metrics
-11. Settings foundation
-12. n8n later
-13. Stripe later
-14. OpenAI later
+2. design tokens and app shell
+3. Supabase database foundation
+4. auth and workspace loading
+5. dashboard and CRUD
+6. CRM refinement
+7. Owner Console workspace controls
+8. pipeline board and grouped stages
+9. personal preferences
+10. assignments
+11. n8n integration
+12. Stripe later
+13. OpenAI later
 
-## Terminal Commands
+## Validation
 
-Use RTK for terminal commands when possible, but only for commands that exist as real executables on Windows.
+- run `npm run build` after meaningful app changes
+- run `npm run lint` and `npm run typecheck` where available
+- for documentation-only patches, validate with diff review and skip build unless code changed accidentally
 
-Prefer:
+## Terminal Notes
 
-- `rtk git status`
-- `rtk git diff`
-- `rtk npm run build`
-- `rtk npm run lint`
-- `rtk npx tsc --noEmit`
-
-Do not use `rtk ls` in Windows PowerShell because `ls` is only a PowerShell alias, not a real executable.
-
-For listing files in PowerShell, use:
-
-- `Get-ChildItem`
-- `dir`
-
-For searching text in PowerShell, use:
-
-- `Select-String`
-
-If RTK fails or is unavailable, fall back to the normal command and explain why.
+Prefer RTK commands when they map to real Windows executables. Use PowerShell-native commands for file listing and text search when needed.

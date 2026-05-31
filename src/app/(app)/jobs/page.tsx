@@ -1,9 +1,9 @@
-import { JobsList } from "@/components/jobs/JobsList";
-import { JobsPageHeader } from "@/components/jobs/JobsPageHeader";
-import { JobsToolbar } from "@/components/jobs/JobsToolbar";
+import { JobsWorkspace } from "@/components/jobs/JobsWorkspace";
+import { getCurrentWorkspaceMemberId } from "@/lib/assignments/queries";
 import { getJobsForActiveWorkspace } from "@/lib/jobs/queries";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
 import {
+  canAssignOperationalRecords,
   canCreateOperationalRecords,
   canDeleteOperationalRecords,
 } from "@/lib/permissions/workspace";
@@ -13,7 +13,10 @@ import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 export default async function JobsPage() {
   const activeWorkspace = await getActiveWorkspace();
   const supabase = await createClient();
-  const jobs = await getJobsForActiveWorkspace();
+  const [jobs, currentMemberId] = await Promise.all([
+    getJobsForActiveWorkspace(),
+    getCurrentWorkspaceMemberId(),
+  ]);
   const rolePermission =
     activeWorkspace.status === "ready"
       ? await getEffectiveRolePermission({
@@ -29,16 +32,17 @@ export default async function JobsPage() {
   const canDeleteRecords =
     activeWorkspace.status === "ready" &&
     canDeleteOperationalRecords(activeWorkspace.context.role);
+  const canAssignRecords =
+    activeWorkspace.status === "ready" &&
+    canAssignOperationalRecords(activeWorkspace.context.role);
 
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <JobsPageHeader canCreateRecords={canCreateRecords} />
-      <JobsToolbar />
-      <JobsList
-        canCreateRecords={canCreateRecords}
-        canDeleteRecords={canDeleteRecords}
-        jobs={jobs}
-      />
-    </div>
+    <JobsWorkspace
+      canAssignRecords={canAssignRecords}
+      canCreateRecords={canCreateRecords}
+      canDeleteRecords={canDeleteRecords}
+      currentMemberId={currentMemberId}
+      jobs={jobs}
+    />
   );
 }

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { WorkspaceModuleSettings } from "@/types/domain";
 
@@ -70,18 +71,23 @@ export function ModulesForm({ canManageSettings, modules }: ModulesFormProps) {
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not update workspace modules.");
+        const errorMessage =
+          message ?? "We could not update workspace modules.";
+        setError(errorMessage);
+        notify.error("Modules could not be updated", errorMessage);
         return;
       }
 
       setSuccess("Workspace modules updated.");
+      notify.success("Modules updated", "Workspace module visibility was saved.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not update workspace modules.",
-      );
+          : "We could not update workspace modules.";
+      setError(errorMessage);
+      notify.error("Modules could not be updated", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

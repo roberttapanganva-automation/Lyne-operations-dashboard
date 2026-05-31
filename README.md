@@ -1,110 +1,206 @@
-# OpsPilot / ServiceOps Command Center
+# Lyne
 
-OpsPilot is a premium multi-tenant SaaS operations dashboard for service businesses.
+Lyne is a premium ServiceOps Command Center for service businesses. It brings CRM activity, jobs, tasks, calendar scheduling, pipelines, assignments, owner controls, and automation-ready inbound APIs into one workspace-scoped dashboard.
 
-It is designed to help service-based teams capture leads, track jobs, manage tasks, view daily operations, customize workspace branding, and prepare for automation workflows through n8n.
+The product was previously developed under the OpsPilot name. Lyne is now the default and fallback brand, while each workspace owner can still customize their own app name, logo, icon, login branding, and colors from Owner Console.
 
----
+## Product Direction
 
-## Project Status
+Lyne is built for small and growing service teams that need a clear operating system for day-to-day work:
 
-This project is currently in active development.
+- Capture and manage leads from inquiries and automation sources.
+- Track contacts and clients without creating a separate contacts table.
+- Schedule jobs and appointments.
+- Manage tasks, follow-ups, and ownership.
+- Move real lead and job cards through pipeline stages.
+- Assign work manually or through round-robin automation.
+- Keep workspace controls in an owner-only console.
+- Connect n8n or similar automation tools through secure inbound API keys.
 
-Current focus:
-
-- Next.js App Router foundation
-- Supabase database and RLS setup
-- Workspace-based multi-tenant structure
-- Owner/Admin role permissions
-- Dashboard UI
-- Leads, jobs, tasks, appointments, and pipelines
-- Workspace branding customization
-
-Future modules:
-
-- n8n automation bridge
-- Stripe billing
-- OpenAI assistant features
-- Client-ready white-label deployment
-
----
+Lyne does not use fake dashboard data. Empty states are preferred when no real workspace data exists.
 
 ## Tech Stack
 
-- **Framework:** Next.js App Router
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS
-- **Database:** Supabase Postgres
-- **Auth:** Supabase Auth
-- **Security:** Supabase Row Level Security
-- **Deployment:** Vercel
-- **Automation:** n8n later
-- **AI:** OpenAI later
-- **Billing:** Stripe later
+- Next.js App Router
+- TypeScript
+- Tailwind CSS
+- Phosphor Icons
+- Supabase Auth
+- Supabase Postgres
+- Supabase Row Level Security
+- Supabase migrations
+- n8n-compatible automation endpoints
+- Vercel-ready deployment structure
 
----
+Planned later:
 
-## Core Features
+- Stripe billing
+- OpenAI-assisted workflows
+- public booking or lead form surfaces
+- full workflow builder
 
-### Workspace System
+## Current Modules
 
-Each business account is handled as a workspace.
+- Dashboard / Overview
+- CRM with Leads and Contacts tabs
+- Jobs
+- Tasks
+- Calendar with month view, appointment list, and settings shell
+- Pipelines
+- Automations
+- API Access for inbound automation keys
+- Reports
+- Account / personal preferences
+- Owner Console
 
-The workspace system supports:
+Owner Console includes workspace-level controls for:
 
-- Workspace profile
-- Workspace members
-- Member roles
-- Workspace branding
-- Module visibility
-- Pipeline customization
+- team members
+- invitations
+- branding
+- modules
+- pipeline groups and stages
+- access rules
+- audit logs
+- assignment rules
 
----
+## Branding
 
-### Role-Based Access
+Default fallback brand:
 
-Supported workspace roles:
+- App name: `Lyne`
+- Subtitle: `ServiceOps Command Center`
+- Primary color: `#7C5CFF`
+- Accent color: `#8B7CFF`
+- Dark/navy: `#0B1020`
+- Text: `#0F172A`
+- Default icon: `public/brand/lyne-icon.png`
 
-- Owner
-- Admin
-- Manager
-- Staff
-- Viewer
+Workspace owners can override these defaults through Owner Console. Existing workspace branding should always win over Lyne fallback values.
 
-Current permission direction:
+## Security Model
 
-- Owners and admins can manage workspace branding and settings.
-- Managers and staff can operate inside assigned workflows.
-- Viewers have read-only access where supported.
+Lyne is workspace-scoped and role-aware.
 
----
+Core rules:
 
-### Dashboard
+- Keep Supabase RLS enabled.
+- Do not use the Supabase service role key for normal app flows.
+- Do not accept `workspace_id` from normal client writes.
+- Do not trust client-supplied `user_id`, role, or workspace claims.
+- Resolve authenticated workspace/member context server-side.
+- Keep server-only secrets out of browser code.
+- Do not expose API key hashes or raw automation secrets.
 
-The dashboard is built to answer one main question:
+Roles:
 
-> What needs attention today?
+- `owner`: full workspace control and Owner Console access.
+- `admin`: operational access, no Owner Console by default unless explicitly allowed later.
+- `manager`: operational access and assignment control by default.
+- `staff`: daily assigned work; cannot reassign by default.
+- `viewer`: read-only where practical.
 
-Dashboard sections include:
+## Automation Model
 
-- New leads
-- Jobs booked
-- Estimated revenue
-- Overdue tasks
-- Pipeline overview
-- Today’s agenda
-- Recent activity
-- AI assistant placeholder
+Lyne owns assignment logic, security checks, and database writes.
 
----
+n8n or other automation tools can trigger workflows, notifications, reminders, and inbound lead creation through secure API routes. Automation failures should not break core app actions.
 
-### Pipelines
+Important server-only variables:
 
-OpsPilot supports customizable pipeline groups.
+- `N8N_WEBHOOK_BASE_URL`
+- `N8N_SIGNING_SECRET`
 
-Example cleaning service pipelines:
+Do not add `NEXT_PUBLIC_N8N_*` variables.
 
-**Sales Pipeline**
+## Local Development
 
-```text
-New Inquiry → Contacted → Quote Sent → Follow-Up Needed → Booked → Lost
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create a local environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Fill in Supabase values:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_APP_NAME=Lyne
+NEXT_PUBLIC_APP_ENV=development
+NEXT_PUBLIC_DEMO_MODE=false
+N8N_WEBHOOK_BASE_URL=
+N8N_SIGNING_SECRET=
+```
+
+Run the development server:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Validation Commands
+
+Use these before shipping meaningful app changes:
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
+
+Supabase migration dry runs, when a migration is changed:
+
+```bash
+npx supabase db push --dry-run
+```
+
+Do not run `db push` automatically unless explicitly approved.
+
+## Repository Guide
+
+Important paths:
+
+- `src/app` - Next.js App Router routes and API routes.
+- `src/components` - dashboard, shell, forms, tables, and feature UI.
+- `src/lib` - server helpers, validation, Supabase queries, permissions, and domain logic.
+- `src/types` - shared TypeScript domain types.
+- `supabase/migrations` - database migrations.
+- `docs` - product, database, UI, QA, and implementation reports.
+- `public/brand` - default Lyne brand assets.
+
+Before changing implementation, read:
+
+1. `AGENTS.md`
+2. `docs/OpsPilot_ServiceOps_Master_Blueprint_NEXTJS.md`
+3. `docs/ServiceOps_Command_Center_DB_Blueprint_NEXTJS.md`
+4. `docs/ServiceOps_Command_Center_UI_Blueprint_NEXTJS.md`
+5. `docs/ServiceOps_Command_Center_Codex_SKILL_NEXTJS.md`
+6. `docs/CURRENT_IMPLEMENTATION_STATUS.md`
+
+## Current Status
+
+Lyne is an active MVP build. The dashboard supports real workspace-scoped data, role-aware UI, personal preferences, owner workspace controls, assignments, inbound API access, automation logs, and a production-styled login experience.
+
+Known deferred areas:
+
+- Stripe billing
+- OpenAI assistant actions
+- public booking pages
+- public lead forms
+- full workflow builder
+- true real-time presence
+- owner transfer
+- workspace deletion hardening
+
+## License
+
+Private project. All rights reserved unless a license is added later.

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { Workspace } from "@/types/domain";
 
@@ -56,18 +57,23 @@ export function WorkspaceProfileForm({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not update the workspace profile.");
+        const errorMessage =
+          message ?? "We could not update the workspace profile.";
+        setError(errorMessage);
+        notify.error("Workspace update failed", errorMessage);
         return;
       }
 
       setSuccess("Workspace profile updated.");
+      notify.success("Workspace updated", "Workspace settings were saved.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not update the workspace profile.",
-      );
+          : "We could not update the workspace profile.";
+      setError(errorMessage);
+      notify.error("Workspace update failed", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

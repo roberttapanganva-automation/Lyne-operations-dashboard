@@ -15,7 +15,7 @@ export function TodayAgenda({ items }: TodayAgendaProps) {
     <Card className="p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <SectionHeader
-          description="Appointments and scheduled jobs for the active workspace."
+          description="Stay ahead of the day with a focused view of confirmed visits, service windows, and operational commitments."
           title="Today's Agenda"
         />
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--ops-info-soft)] text-[var(--ops-info)]">

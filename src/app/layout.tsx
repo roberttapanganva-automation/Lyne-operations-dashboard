@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import "goey-toast/styles.css";
 import "./globals.css";
+import { AppToaster } from "@/components/ui/AppToaster";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -8,8 +11,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "OpsPilot",
-  description: "ServiceOps Command Center for service businesses.",
+  title: DEFAULT_BRAND.appName,
+  description: `${DEFAULT_BRAND.subtitle} for service businesses.`,
+  icons: {
+    apple: DEFAULT_BRAND.iconUrl,
+    icon: DEFAULT_BRAND.iconUrl,
+    shortcut: DEFAULT_BRAND.iconUrl,
+  },
 };
 
 export default function RootLayout({
@@ -23,7 +31,10 @@ export default function RootLayout({
       className={`${inter.variable} h-full`}
       suppressHydrationWarning
     >
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        {children}
+        <AppToaster />
+      </body>
     </html>
   );
 }

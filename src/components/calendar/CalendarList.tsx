@@ -1,16 +1,19 @@
 "use client";
 
-import { PlusCircleIcon, TrashIcon } from "@phosphor-icons/react";
+import { PlusCircleIcon } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Card } from "@/components/ui/Card";
+import { BulkActionBar } from "@/components/ui/BulkActionBar";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { DateTimeCell, DateTimeHeader } from "@/components/ui/DateTimeCell";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import {
   AppointmentStatusBadge,
   type AppointmentStatus,
 } from "./AppointmentStatusBadge";
 import { CalendarEmptyState } from "./CalendarEmptyState";
+import { EditAppointmentDialog } from "./EditAppointmentDialog";
 
 export type AppointmentListItem = {
   client: {
@@ -61,8 +64,11 @@ export function CalendarList({
   const router = useRouter();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingAppointment, setEditingAppointment] =
+    useState<AppointmentListItem | null>(null);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   if (appointments.length === 0) {
@@ -95,6 +101,14 @@ export function CalendarList({
     });
   }
 
+  function openAppointmentEditor(appointment: AppointmentListItem) {
+    if (!canCreateRecords) {
+      return;
+    }
+
+    setEditingAppointment(appointment);
+  }
+
   async function deleteSelectedAppointments() {
     setError(null);
     setIsDeleting(true);
@@ -110,71 +124,76 @@ export function CalendarList({
       const result = (await response.json()) as ApiResponse<{ ids: string[] }>;
 
       if (!response.ok || !result.ok) {
-        setError(
-          result.ok
-            ? "We could not delete the selected appointments. Please try again."
-            : result.error.message,
-        );
+        const message = result.ok
+          ? "We could not delete the selected appointments. Please try again."
+          : result.error.message;
+        setError(message);
+        notify.error("Appointments could not be deleted", message);
         return;
       }
 
       setSelectedIds([]);
+      setSelectionMode(false);
+      setBulkDeleteOpen(false);
+      notify.success("Deleted successfully");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not delete the selected appointments. Please try again.",
-      );
+          : "We could not delete the selected appointments. Please try again.";
+      setError(message);
+      notify.error("Appointments could not be deleted", message);
     } finally {
       setIsDeleting(false);
     }
   }
 
   return (
-    <Card className="overflow-hidden">
-      <div className="flex flex-col gap-4 border-b border-[var(--ops-border)] px-5 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-base font-semibold text-[var(--ops-text)]">
-          Appointment list
-        </h2>
-        {canDeleteRecords ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--ops-border)] bg-white px-3 text-sm font-semibold text-[var(--ops-text-soft)] shadow-sm transition hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
-              onClick={toggleSelectionMode}
-              type="button"
-            >
-              <PlusCircleIcon aria-hidden="true" size={18} weight="regular" />
-              {selectionMode ? "Cancel selection" : "Select"}
-            </button>
-            {selectionMode ? (
-              <>
+    <>
+      <div className="space-y-3 border-b border-[var(--ops-border)] px-5 py-4 sm:px-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <h2 className="text-base font-semibold text-[var(--ops-text)]">
+            Appointment list
+          </h2>
+          {canDeleteRecords ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--ops-border)] bg-white px-3 text-sm font-semibold text-[var(--ops-text-soft)] shadow-sm transition hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+                onClick={toggleSelectionMode}
+                type="button"
+              >
+                <PlusCircleIcon aria-hidden="true" size={18} weight="regular" />
+                {selectionMode ? "Cancel selection" : "Select"}
+              </button>
+              {selectionMode ? (
                 <button
                   className="inline-flex h-9 items-center rounded-lg border border-[var(--ops-border)] bg-white px-3 text-sm font-semibold text-[var(--ops-text-soft)] shadow-sm transition hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
                   onClick={toggleAllAppointments}
                   type="button"
                 >
                   {selectedIds.length === appointments.length
-                    ? "Clear all"
+                    ? "Clear visible"
                     : "Select visible"}
                 </button>
-                <button
-                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 text-sm font-semibold text-[var(--ops-danger)] shadow-sm transition hover:border-red-200 hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={selectedIds.length === 0 || isDeleting}
-                  onClick={deleteSelectedAppointments}
-                  type="button"
-                >
-                  <TrashIcon aria-hidden="true" size={18} weight="regular" />
-                  {isDeleting
-                    ? "Deleting..."
-                    : `Delete selected (${selectedIds.length})`}
-                </button>
-              </>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        {canDeleteRecords && selectionMode && selectedIds.length > 0 ? (
+          <BulkActionBar
+            canDelete
+            canEdit={false}
+            entityLabel="appointment"
+            onClearSelection={() => setSelectedIds([])}
+            onDelete={() => setBulkDeleteOpen(true)}
+            selectedCount={selectedIds.length}
+          />
         ) : null}
         {error ? (
-          <p className="text-sm text-[var(--ops-danger)]">{error}</p>
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--ops-danger)]">
+            {error}
+          </p>
         ) : null}
       </div>
 
@@ -214,7 +233,20 @@ export function CalendarList({
           </thead>
           <tbody className="divide-y divide-[var(--ops-border)] bg-white">
             {appointments.map((appointment) => (
-              <tr key={appointment.id}>
+              <tr
+                className={
+                  canCreateRecords
+                    ? "cursor-pointer transition hover:bg-[var(--ops-card-soft)]"
+                    : undefined
+                }
+                key={appointment.id}
+                onDoubleClick={() => openAppointmentEditor(appointment)}
+                title={
+                  canCreateRecords
+                    ? "Double-click to edit this appointment"
+                    : undefined
+                }
+              >
                 {canDeleteRecords && selectionMode ? (
                   <td className="px-5 py-4 sm:px-6">
                     <input
@@ -222,6 +254,7 @@ export function CalendarList({
                       checked={selectedIdSet.has(appointment.id)}
                       className="h-4 w-4 rounded border-[var(--ops-border)] accent-[var(--ops-primary)]"
                       onChange={() => toggleAppointment(appointment.id)}
+                      onDoubleClick={(event) => event.stopPropagation()}
                       type="checkbox"
                     />
                   </td>
@@ -260,7 +293,20 @@ export function CalendarList({
 
       <div className="divide-y divide-[var(--ops-border)] xl:hidden">
         {appointments.map((appointment) => (
-          <article className="p-5" key={appointment.id}>
+          <article
+            className={
+              canCreateRecords
+                ? "cursor-pointer p-5 transition hover:bg-[var(--ops-card-soft)]"
+                : "p-5"
+            }
+            key={appointment.id}
+            onDoubleClick={() => openAppointmentEditor(appointment)}
+            title={
+              canCreateRecords
+                ? "Double-click to edit this appointment"
+                : undefined
+            }
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="font-semibold text-[var(--ops-text)]">
@@ -279,6 +325,7 @@ export function CalendarList({
                     checked={selectedIdSet.has(appointment.id)}
                     className="h-4 w-4 rounded border-[var(--ops-border)] accent-[var(--ops-primary)]"
                     onChange={() => toggleAppointment(appointment.id)}
+                    onDoubleClick={(event) => event.stopPropagation()}
                     type="checkbox"
                   />
                   Select
@@ -329,6 +376,34 @@ export function CalendarList({
           </article>
         ))}
       </div>
-    </Card>
+
+      {editingAppointment ? (
+        <EditAppointmentDialog
+          appointment={editingAppointment}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingAppointment(null);
+            }
+          }}
+          open
+        />
+      ) : null}
+      <ConfirmDeleteDialog
+        confirmLabel={
+          selectedIds.length === 1 ? "Delete appointment" : "Delete appointments"
+        }
+        description="This will permanently remove the selected appointment records from this workspace. Use this only for cancelled, duplicate, or incorrectly added appointments."
+        isSubmitting={isDeleting}
+        itemCount={selectedIds.length}
+        onCancel={() => {
+          if (!isDeleting) {
+            setBulkDeleteOpen(false);
+          }
+        }}
+        onConfirm={deleteSelectedAppointments}
+        open={bulkDeleteOpen && selectedIds.length > 0}
+        title="Delete selected appointments?"
+      />
+    </>
   );
 }

@@ -1,5 +1,20 @@
+import {
+  BriefcaseIcon,
+  CalendarBlankIcon,
+  CheckSquareIcon,
+  GearSixIcon,
+  KanbanIcon,
+  PaletteIcon,
+  ShieldCheckIcon,
+  UsersThreeIcon,
+} from "@phosphor-icons/react/ssr";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import {
+  buildAuditActivityLookups,
+  presentAuditActivity,
+} from "@/lib/activity/presentation";
+import { createClient } from "@/lib/supabase/server";
 import type { OwnerAuditLog } from "@/types/domain";
 
 function formatDate(value: string) {
@@ -9,18 +24,39 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function metadataSummary(metadata: Record<string, unknown> | null) {
-  if (!metadata || Object.keys(metadata).length === 0) {
-    return "No metadata";
-  }
+function AuditItemIcon({ icon }: { icon: string }) {
+  const props = {
+    className: "text-[var(--workspace-primary,var(--ops-primary-dark))]",
+    size: 18,
+    weight: "duotone" as const,
+  };
 
-  return Object.entries(metadata)
-    .slice(0, 3)
-    .map(([key, value]) => `${key}: ${String(value)}`)
-    .join(", ");
+  switch (icon) {
+    case "lead":
+      return <UsersThreeIcon aria-hidden="true" {...props} />;
+    case "job":
+      return <BriefcaseIcon aria-hidden="true" {...props} />;
+    case "task":
+      return <CheckSquareIcon aria-hidden="true" {...props} />;
+    case "calendar":
+      return <CalendarBlankIcon aria-hidden="true" {...props} />;
+    case "branding":
+      return <PaletteIcon aria-hidden="true" {...props} />;
+    case "access":
+      return <ShieldCheckIcon aria-hidden="true" {...props} />;
+    case "team":
+      return <UsersThreeIcon aria-hidden="true" {...props} />;
+    case "pipeline":
+      return <KanbanIcon aria-hidden="true" {...props} />;
+    default:
+      return <GearSixIcon aria-hidden="true" {...props} />;
+  }
 }
 
-export function AuditLogsList({ logs }: { logs: OwnerAuditLog[] }) {
+export async function AuditLogsList({ logs }: { logs: OwnerAuditLog[] }) {
+  const supabase = await createClient();
+  const lookups = await buildAuditActivityLookups(supabase, logs);
+
   return (
     <Card className="p-5 sm:p-6">
       <h2 className="font-semibold text-[var(--ops-text)]">Audit Logs</h2>
@@ -37,26 +73,35 @@ export function AuditLogsList({ logs }: { logs: OwnerAuditLog[] }) {
         </div>
       ) : (
         <div className="mt-5 divide-y divide-[var(--ops-border)] overflow-hidden rounded-lg border border-[var(--ops-border)]">
-          {logs.map((log) => (
-            <article className="bg-white p-4" key={log.id}>
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <h3 className="font-semibold text-[var(--ops-text)]">
-                    {log.action}
-                  </h3>
-                  <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
-                    {log.entity_type} · {log.entity_id ?? "No entity id"}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
-                    Actor {log.actor_user_id ?? "system"} · {metadataSummary(log.metadata)}
+          {logs.map((log) => {
+            const presentation = presentAuditActivity(log, lookups);
+
+            return (
+              <article className="bg-white p-4" key={log.id}>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex gap-3">
+                    <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--workspace-primary-soft,var(--ops-primary-soft))]">
+                      <AuditItemIcon icon={presentation.icon} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-[var(--ops-text)]">
+                        {presentation.title}
+                      </h3>
+                      <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
+                        {presentation.description}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
+                        {presentation.category}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-[var(--ops-text-muted)]">
+                    {formatDate(log.created_at)}
                   </p>
                 </div>
-                <p className="text-sm text-[var(--ops-text-muted)]">
-                  {formatDate(log.created_at)}
-                </p>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </Card>

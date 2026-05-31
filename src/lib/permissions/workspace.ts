@@ -27,6 +27,22 @@ export function canViewWorkspace(role: WorkspaceRole | null) {
   );
 }
 
+export function canViewReports(role: WorkspaceRole | null) {
+  return role === "owner" || role === "admin" || role === "manager";
+}
+
+export function canViewAutomations(
+  role: WorkspaceRole | null,
+  rolePermissions: WorkspaceRolePermission | null,
+) {
+  return (
+    role === "owner" ||
+    role === "admin" ||
+    role === "manager" ||
+    rolePermissions?.can_view_automations === true
+  );
+}
+
 export function canCreateOperationalRecords(role: WorkspaceRole | null) {
   return canManageOperations(role);
 }
@@ -36,6 +52,10 @@ export function canEditOperationalRecords(role: WorkspaceRole | null) {
 }
 
 export function canDeleteOperationalRecords(role: WorkspaceRole | null) {
+  return role === "owner" || role === "admin" || role === "manager";
+}
+
+export function canAssignOperationalRecords(role: WorkspaceRole | null) {
   return role === "owner" || role === "admin" || role === "manager";
 }
 
@@ -72,6 +92,7 @@ export function getDefaultRolePermission(
       can_create_jobs: true,
       can_create_leads: true,
       can_create_tasks: true,
+      can_view_automations: true,
       can_edit_basic_settings: true,
       can_edit_branding: false,
       can_manage_modules: false,
@@ -92,6 +113,7 @@ export function getDefaultRolePermission(
       can_create_jobs: true,
       can_create_leads: true,
       can_create_tasks: true,
+      can_view_automations: role === "manager",
       can_edit_basic_settings: false,
       can_edit_branding: false,
       can_manage_modules: false,
@@ -112,6 +134,7 @@ export function getDefaultRolePermission(
       can_create_jobs: false,
       can_create_leads: false,
       can_create_tasks: false,
+      can_view_automations: false,
       can_edit_basic_settings: false,
       can_edit_branding: false,
       can_manage_modules: false,

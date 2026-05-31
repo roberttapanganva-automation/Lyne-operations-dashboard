@@ -14,14 +14,44 @@ type PipelineGroupLookup = {
   workspace_id: string;
 };
 
+type ExistingStageLookup = {
+  id: string;
+  name: string;
+};
+
 function jsonResponse<T>(body: ApiResponse<T>, status = 200) {
   return NextResponse.json(body, { status });
+}
+
+async function writePipelineAuditLogSafely(
+  payload: Parameters<typeof writeOwnerAuditLog>[0],
+) {
+  try {
+    await writeOwnerAuditLog(payload);
+  } catch (error) {
+    console.error("Pipeline stage audit log failed", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 }
 
 export async function GET(request: Request) {
   const access = await getOwnerAccessContext();
 
   if (access.status !== "ready") {
+    if (access.error.status === 403) {
+      return jsonResponse(
+        {
+          error: {
+            code: "not_allowed",
+            message: "Only workspace owners can manage pipeline stages.",
+          },
+          ok: false,
+        },
+        403,
+      );
+    }
+
     return jsonResponse(
       {
         error: {
@@ -110,17 +140,54 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!group || group.entity_type !== payload.entity_type) {
+    if (!group) {
       return jsonResponse(
         {
           error: {
-            code: "INVALID_PIPELINE_GROUP",
-            message:
-              "The selected pipeline group is not available for this entity type.",
+            code: "pipeline_group_not_found",
+            message: "Pipeline group not found for this workspace.",
           },
           ok: false,
         },
-        400,
+        404,
+      );
+    }
+
+    const { data: existingStages, error: existingStagesError } = await access.supabase
+      .from("pipeline_stages")
+      .select("id,name")
+      .eq("workspace_id", workspaceId)
+      .eq("pipeline_group_id", payload.pipeline_group_id)
+      .returns<ExistingStageLookup[]>();
+
+    if (existingStagesError) {
+      return jsonResponse(
+        {
+          error: {
+            code: "PIPELINE_STAGE_LOOKUP_FAILED",
+            message: "We could not verify existing stages in this pipeline group.",
+            details: existingStagesError.message,
+          },
+          ok: false,
+        },
+        500,
+      );
+    }
+
+    const duplicateStage = (existingStages ?? []).find(
+      (stage) => stage.name.trim().toLowerCase() === payload.name.trim().toLowerCase(),
+    );
+
+    if (duplicateStage) {
+      return jsonResponse(
+        {
+          error: {
+            code: "duplicate_pipeline_stage",
+            message: "A stage with this name already exists in this pipeline.",
+          },
+          ok: false,
+        },
+        409,
       );
     }
 
@@ -128,7 +195,7 @@ export async function POST(request: Request) {
       .from("pipeline_stages")
       .insert({
         color: payload.color,
-        entity_type: payload.entity_type,
+        entity_type: group.entity_type,
         is_closed: payload.is_closed,
         is_lost: payload.is_lost,
         is_won: payload.is_won,
@@ -141,6 +208,20 @@ export async function POST(request: Request) {
       .single<PipelineStage>();
 
     if (error) {
+      if (error.code === "23505") {
+        return jsonResponse(
+          {
+            error: {
+              code: "duplicate_pipeline_stage",
+              message: "A stage with this name already exists in this pipeline.",
+              details: error.message,
+            },
+            ok: false,
+          },
+          409,
+        );
+      }
+
       return jsonResponse(
         {
           error: {
@@ -154,7 +235,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await writeOwnerAuditLog({
+    await writePipelineAuditLogSafely({
       access,
       action: "pipeline_stage.created",
       entityId: stage.id,

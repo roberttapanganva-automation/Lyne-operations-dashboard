@@ -5,10 +5,12 @@ import { FormEvent, useState } from "react";
 import type { CSSProperties } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import {
   normalizeHexColor,
   validateHexColor,
 } from "@/lib/validation/branding";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { WorkspaceBrandingSettings } from "@/types/domain";
 
@@ -19,9 +21,9 @@ type BrandingFormProps = {
 
 type BrandingResponse = Record<string, unknown>;
 
-const DEFAULT_APP_NAME = "OpsPilot";
-const DEFAULT_PRIMARY_COLOR = "#6D5DFC";
-const DEFAULT_ACCENT_COLOR = "#4F46E5";
+const DEFAULT_APP_NAME = DEFAULT_BRAND.appName;
+const DEFAULT_PRIMARY_COLOR = DEFAULT_BRAND.primaryColor;
+const DEFAULT_ACCENT_COLOR = DEFAULT_BRAND.accentColor;
 
 function getErrorMessage(response: ApiResponse<BrandingResponse>) {
   return response.ok ? null : response.error.message;
@@ -74,7 +76,9 @@ export function BrandingForm({
       !validateHexColor(normalizedPrimaryColor) ||
       !validateHexColor(normalizedAccentColor)
     ) {
-      setError("Use valid HEX colors like #6D5DFC.");
+      const errorMessage = `Use valid HEX colors like ${DEFAULT_PRIMARY_COLOR}.`;
+      setError(errorMessage);
+      notify.warning("Check branding colors", errorMessage);
       return;
     }
 
@@ -103,20 +107,25 @@ export function BrandingForm({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not update workspace branding.");
+        const errorMessage =
+          message ?? "We could not update workspace branding.";
+        setError(errorMessage);
+        notify.error("Branding could not be saved", errorMessage);
         return;
       }
 
       setPrimaryColor(normalizedPrimaryColor);
       setAccentColor(normalizedAccentColor);
       setSuccess("Workspace branding updated.");
+      notify.success("Branding saved", "Workspace branding was updated.");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const errorMessage =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not update workspace branding.",
-      );
+          : "We could not update workspace branding.";
+      setError(errorMessage);
+      notify.error("Branding could not be saved", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

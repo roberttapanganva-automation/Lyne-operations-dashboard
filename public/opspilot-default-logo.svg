@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 240" role="img" aria-labelledby="title desc">
+  <title id="title">OpsPilot Dashboard</title>
+  <desc id="desc">Default OpsPilot Dashboard logo.</desc>
+  <defs>
+    <linearGradient id="opsBlue" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#0A2B8F" />
+      <stop offset="100%" stop-color="#13A3FF" />
+    </linearGradient>
+    <linearGradient id="opsGreen" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#1CCF74" />
+      <stop offset="100%" stop-color="#0FA957" />
+    </linearGradient>
+    <linearGradient id="opsOrange" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFB027" />
+      <stop offset="100%" stop-color="#FF6B1F" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(18 12)">
+    <path d="M116 28c28 0 56 9 79 26 9 7 10 20 1 28l-23 21c-7 6-17 6-24 0-19-16-41-24-64-24s-45 8-64 24c-7 6-17 6-24 0L-27 82c-9-8-8-21 1-28C-2 37 26 28 54 28h62z" fill="#0A2B8F"/>
+    <path d="M26 98c24-13 52-20 83-20s59 7 83 20l-21 20c-7 6-17 7-25 2-12-8-25-12-37-12s-25 4-37 12c-8 5-18 4-25-2L26 98z" fill="#143C9D"/>
+    <path d="M28 120h164c0 53-38 91-88 91-50 0-88-38-88-91z" fill="#0B287C"/>
+    <path d="M27 121l50 0-26 56c-18-14-24-34-24-56z" fill="url(#opsGreen)"/>
+    <path d="M181 121l-50 0 26 56c18-14 24-34 24-56z" fill="url(#opsOrange)"/>
+    <path d="M104 118c19 0 34 15 34 34 0 17-12 31-28 34v16c0 9-7 16-16 16s-16-7-16-16v-20c0-22 18-40 40-40h-14z" fill="url(#opsBlue)"/>
+    <circle cx="104" cy="167" r="8" fill="#0A2B8F"/>
+    <path d="M10 96h32l-12 14H0z" fill="#6DD6FF" opacity=".55"/>
+    <path d="M198 96h32l-12 14h-30z" fill="#A88CFF" opacity=".5"/>
+  </g>
+  <g fill="url(#opsBlue)" transform="translate(252 42)">
+    <path d="M0 78C0 34 30 0 73 0s73 34 73 78-30 78-73 78S0 122 0 78zm43 0c0 23 11 42 30 42s30-19 30-42-11-42-30-42S43 55 43 78z"/>
+    <path d="M166 25h39v17c10-14 24-21 42-21 34 0 59 28 59 67 0 40-26 68-61 68-16 0-29-6-39-17v57h-40V25zm39 65c0 18 12 31 30 31 19 0 31-13 31-31s-12-31-31-31c-18 0-30 13-30 31z"/>
+    <path d="M320 25h40v131h-40V25z"/>
+    <path d="M379 25h40v131h-40V25zm0-23h40v19h-40V2z"/>
+    <path d="M441 25h39v17c10-14 24-21 42-21 34 0 59 28 59 67 0 40-26 68-61 68-16 0-29-6-39-17v57h-40V25zm39 65c0 18 12 31 30 31 19 0 31-13 31-31s-12-31-31-31c-18 0-30 13-30 31z"/>
+  </g>
+  <g fill="#444A59" transform="translate(507 182)">
+    <path d="M0 0h18l17 44L52 0h18L38 72H31L0 0z"/>
+    <path d="M79 0h18v72H79V0z"/>
+    <path d="M115 0h58v15h-40v13h37v15h-37v14h41v15h-59V0z"/>
+    <path d="M188 0h19l16 45L240 0h15l17 45L289 0h19l-27 72h-16l-18-47-18 47h-16L188 0z"/>
+  </g>
+</svg>

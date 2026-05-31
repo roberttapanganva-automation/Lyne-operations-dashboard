@@ -18,6 +18,18 @@ function jsonResponse<T>(body: ApiResponse<T>, status = 200) {
   return NextResponse.json(body, { status });
 }
 
+async function writePipelineAuditLogSafely(
+  payload: Parameters<typeof writeOwnerAuditLog>[0],
+) {
+  try {
+    await writeOwnerAuditLog(payload);
+  } catch (error) {
+    console.error("Pipeline group audit log failed", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
+
 async function getGroupId(context: RouteContext) {
   const { groupId } = await context.params;
 
@@ -167,7 +179,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    await writeOwnerAuditLog({
+    await writePipelineAuditLogSafely({
       access,
       action: "pipeline_group.updated",
       entityId: group.id,
@@ -285,7 +297,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       );
     }
 
-    await writeOwnerAuditLog({
+    await writePipelineAuditLogSafely({
       access,
       action: "pipeline_group.deleted",
       entityId: groupId,

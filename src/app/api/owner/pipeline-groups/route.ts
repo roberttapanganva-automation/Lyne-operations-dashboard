@@ -8,8 +8,25 @@ import type { PipelineGroup } from "@/types/domain";
 const pipelineGroupSelect =
   "id,workspace_id,name,description,entity_type,order_index,is_default,created_by,updated_by,created_at,updated_at";
 
+type ExistingGroupLookup = {
+  id: string;
+  name: string;
+};
+
 function jsonResponse<T>(body: ApiResponse<T>, status = 200) {
   return NextResponse.json(body, { status });
+}
+
+async function writePipelineAuditLogSafely(
+  payload: Parameters<typeof writeOwnerAuditLog>[0],
+) {
+  try {
+    await writeOwnerAuditLog(payload);
+  } catch (error) {
+    console.error("Pipeline group audit log failed", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 }
 
 export async function GET() {
@@ -78,9 +95,10 @@ export async function POST(request: Request) {
     const workspaceId = access.activeWorkspace.workspace.id;
     const { data: existingForEntity, error: existingError } = await access.supabase
       .from("pipeline_groups")
-      .select("id")
+      .select("id,name")
       .eq("workspace_id", workspaceId)
-      .eq("entity_type", payload.entity_type);
+      .eq("entity_type", payload.entity_type)
+      .returns<ExistingGroupLookup[]>();
 
     if (existingError) {
       return jsonResponse(
@@ -93,6 +111,24 @@ export async function POST(request: Request) {
           ok: false,
         },
         500,
+      );
+    }
+
+    const duplicateGroup = (existingForEntity ?? []).find(
+      (group) => group.name.trim().toLowerCase() === payload.name.trim().toLowerCase(),
+    );
+
+    if (duplicateGroup) {
+      return jsonResponse(
+        {
+          error: {
+            code: "PIPELINE_GROUP_DUPLICATE",
+            message:
+              "A pipeline group with this name already exists for that entity type.",
+          },
+          ok: false,
+        },
+        409,
       );
     }
 
@@ -138,6 +174,21 @@ export async function POST(request: Request) {
       .single<PipelineGroup>();
 
     if (error) {
+      if (error.code === "23505") {
+        return jsonResponse(
+          {
+            error: {
+              code: "PIPELINE_GROUP_DUPLICATE",
+              message:
+                "A pipeline group with this name already exists for that entity type.",
+              details: error.message,
+            },
+            ok: false,
+          },
+          409,
+        );
+      }
+
       return jsonResponse(
         {
           error: {
@@ -151,7 +202,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await writeOwnerAuditLog({
+    await writePipelineAuditLogSafely({
       access,
       action: "pipeline_group.created",
       entityId: group.id,

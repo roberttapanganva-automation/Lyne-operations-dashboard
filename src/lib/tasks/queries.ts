@@ -1,8 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
+import { getAssignmentDisplayMapForWorkspace } from "@/lib/assignments/queries";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
+import type { AssignableWorkspaceMember } from "@/types/domain";
 import type { TaskListItem } from "@/components/tasks/TasksList";
 
 type TaskRow = {
+  assigned_member_id: string | null;
   completed_at: string | null;
   created_at: string;
   description: string | null;
@@ -15,8 +18,22 @@ type TaskRow = {
   title: string;
 };
 
-function normalizeTask(row: TaskRow): TaskListItem {
+function isMissingAssignmentColumnError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("assigned_member_id") &&
+      error.message.includes("does not exist"),
+  );
+}
+
+function normalizeTask(
+  row: TaskRow,
+  assignmentsByMemberId: Map<string, AssignableWorkspaceMember>,
+): TaskListItem {
   return {
+    assigned_member: row.assigned_member_id
+      ? assignmentsByMemberId.get(row.assigned_member_id) ?? null
+      : null,
+    assigned_member_id: row.assigned_member_id,
     completed_at: row.completed_at,
     created_at: row.created_at,
     description: row.description,
@@ -38,18 +55,68 @@ export async function getTasksForActiveWorkspace(): Promise<TaskListItem[]> {
   }
 
   const supabase = await createClient();
+  const workspaceId = activeWorkspace.context.workspace.id;
   const { data, error } = await supabase
     .from("tasks")
     .select(
-      "id,title,description,due_at,priority,status,related_type,related_id,completed_at,created_at",
+      "id,assigned_member_id,title,description,due_at,priority,status,related_type,related_id,completed_at,created_at",
     )
-    .eq("workspace_id", activeWorkspace.context.workspace.id)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false })
     .returns<TaskRow[]>();
 
   if (error) {
+    if (isMissingAssignmentColumnError(error)) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("tasks")
+        .select(
+          "id,title,description,due_at,priority,status,related_type,related_id,completed_at,created_at",
+        )
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .returns<Omit<TaskRow, "assigned_member_id">[]>();
+
+      if (fallbackError) {
+        throw new Error(fallbackError.message);
+      }
+
+      return await normalizeTasksForDisplay({
+        supabase,
+        tasks: (fallbackData ?? []).map((task) => ({
+          ...task,
+          assigned_member_id: null,
+        })),
+        workspaceId,
+      });
+    }
+
     throw new Error(error.message);
   }
 
-  return (data ?? []).map(normalizeTask);
+  const tasks = data ?? [];
+  return await normalizeTasksForDisplay({
+    supabase,
+    tasks,
+    workspaceId,
+  });
+}
+
+async function normalizeTasksForDisplay({
+  supabase,
+  tasks,
+  workspaceId,
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  tasks: TaskRow[];
+  workspaceId: string;
+}) {
+  const assignmentsByMemberId = await getAssignmentDisplayMapForWorkspace({
+    memberIds: tasks
+      .map((task) => task.assigned_member_id)
+      .filter((memberId): memberId is string => Boolean(memberId)),
+    supabase,
+    workspaceId,
+  });
+
+  return tasks.map((task) => normalizeTask(task, assignmentsByMemberId));
 }

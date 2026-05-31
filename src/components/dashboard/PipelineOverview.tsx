@@ -67,7 +67,7 @@ export function PipelineOverview({
     <Card className="p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <SectionHeader
-          description="Preview of the active owner-defined workflow. Open Pipelines for the full board."
+          description="Keep an eye on stage momentum, card volume, and open value across the workflow that is driving today’s pipeline."
           title="Pipeline Overview"
         />
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--ops-primary-soft)] text-[var(--ops-primary-dark)]">
@@ -130,7 +130,7 @@ export function PipelineOverview({
 
           <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--ops-border)] pt-4">
             <p className="text-sm text-[var(--ops-text-soft)]">
-              Full stage movement and card operations live on the Pipelines page.
+              Open the board to review live movement, rebalance workload, and keep deals advancing cleanly.
             </p>
             <Link
               className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--ops-primary-dark)] transition hover:text-[var(--workspace-accent,var(--ops-primary-dark))]"

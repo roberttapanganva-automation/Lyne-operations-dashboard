@@ -38,6 +38,7 @@ export const workspaceRolePermissionPatchSchema = z.object({
   can_create_jobs: z.boolean(),
   can_create_leads: z.boolean(),
   can_create_tasks: z.boolean(),
+  can_view_automations: z.boolean(),
   can_edit_basic_settings: z.boolean(),
   can_edit_branding: z.boolean(),
   can_manage_modules: z.boolean(),

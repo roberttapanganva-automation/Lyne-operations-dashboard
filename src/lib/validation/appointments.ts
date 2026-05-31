@@ -74,4 +74,24 @@ export const createAppointmentSchema = z
     },
   );
 
+export const updateAppointmentSchema = z
+  .object({
+    ends_at: optionalDateTime,
+    location: optionalText,
+    notes: optionalText,
+    starts_at: requiredDateTime,
+    status: appointmentStatusSchema,
+    title: z.string().trim().min(1, "Appointment title is required."),
+  })
+  .refine(
+    (appointment) =>
+      !appointment.ends_at ||
+      Date.parse(appointment.ends_at) >= Date.parse(appointment.starts_at),
+    {
+      message: "End time must be after the start time.",
+      path: ["ends_at"],
+    },
+  );
+
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
+export type UpdateAppointmentInput = z.infer<typeof updateAppointmentSchema>;

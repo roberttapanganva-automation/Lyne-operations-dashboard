@@ -28,7 +28,7 @@ type AppointmentResponse = {
 };
 
 const deleteAppointmentsSchema = z.object({
-  ids: z.array(z.uuid()).min(1),
+  ids: z.array(z.uuid()).min(1).max(200),
 });
 
 function jsonResponse<T>(body: ApiResponse<T>, status = 200) {
@@ -394,11 +394,49 @@ export async function DELETE(request: Request) {
 
   try {
     const payload = deleteAppointmentsSchema.parse(await request.json());
+    const workspaceId = activeWorkspace.context.workspace.id;
+    const ids = [...new Set(payload.ids)];
+    const { data: availableAppointments, error: availableError } =
+      await supabase
+        .from("appointments")
+        .select("id,title")
+        .eq("workspace_id", workspaceId)
+        .in("id", ids)
+        .returns<{ id: string; title: string }[]>();
+
+    if (availableError) {
+      return jsonResponse(
+        {
+          error: {
+            code: "APPOINTMENTS_LOOKUP_FAILED",
+            message: "We could not verify the selected appointments.",
+            details: availableError.message,
+          },
+          ok: false,
+        },
+        500,
+      );
+    }
+
+    if ((availableAppointments ?? []).length !== ids.length) {
+      return jsonResponse(
+        {
+          error: {
+            code: "APPOINTMENTS_SCOPE_MISMATCH",
+            message:
+              "Some selected appointments are not available in this workspace.",
+          },
+          ok: false,
+        },
+        400,
+      );
+    }
+
     const { data: appointments, error: appointmentError } = await supabase
       .from("appointments")
       .delete()
-      .in("id", payload.ids)
-      .eq("workspace_id", activeWorkspace.context.workspace.id)
+      .in("id", ids)
+      .eq("workspace_id", workspaceId)
       .select("id,title")
       .returns<{ id: string; title: string }[]>();
 
@@ -426,7 +464,7 @@ export async function DELETE(request: Request) {
         count: appointments?.length ?? 0,
         ids: appointments?.map((appointment) => appointment.id) ?? [],
       },
-      workspace_id: activeWorkspace.context.workspace.id,
+      workspace_id: workspaceId,
     });
 
     return jsonResponse({

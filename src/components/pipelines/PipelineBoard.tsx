@@ -42,46 +42,18 @@ export function PipelineBoard({
     );
   }
 
-  const stageOptions = board.stages.map((stage) => ({
-    id: stage.id,
-    name: stage.name,
-  }));
-
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-[var(--ops-border)] bg-white p-4 sm:p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ops-text-muted)]">
-              Active workflow
-            </p>
-            <h2 className="mt-1 text-lg font-semibold text-[var(--ops-text)]">
-              {board.selected_group.name}
-            </h2>
-            <p className="mt-1 text-sm text-[var(--ops-text-soft)]">
-              {board.selected_group.description?.trim() ||
-                "Owner-defined workflow for active workspace records."}
-            </p>
-          </div>
-          <div className="text-sm text-[var(--ops-text-soft)]">
-            {board.can_move_cards
-              ? "Use the move control on each card to update its stage."
-              : "Viewer access is read-only on the pipeline board."}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:overflow-x-auto md:pb-2">
+    <div className="max-h-[calc(100vh-15rem)] min-h-[340px] overflow-x-auto overflow-y-hidden pb-2">
+      <div className="flex h-[calc(100vh-16rem)] min-h-[320px] min-w-max items-stretch gap-2">
         {board.stages.map((stage) => (
           <PipelineColumn
             canMoveCards={board.can_move_cards}
             currencyCode={currencyCode}
             key={stage.id}
             stage={stage}
-            stageOptions={stageOptions}
           />
         ))}
       </div>
     </div>
-  );
+  )
 }

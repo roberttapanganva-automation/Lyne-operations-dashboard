@@ -21,11 +21,11 @@ function formatTimePart(value: string) {
 
 export function DateTimeHeader({ label }: DateTimeHeaderProps) {
   return (
-    <div className="min-w-[160px]">
-      <span className="block">{label}</span>
-      <span className="mt-1 grid grid-cols-[minmax(92px,1fr)_64px] gap-3 text-[10px] font-semibold normal-case tracking-normal text-[var(--ops-text-muted)]/70">
+    <div className="min-w-[180px]">
+      <span className="block text-center">{label}</span>
+      <span className="mt-1 grid grid-cols-[minmax(0,1fr)_88px] gap-4 text-[10px] font-semibold normal-case tracking-normal text-[var(--ops-text-muted)]/70">
         <span>Date</span>
-        <span>Time</span>
+        <span className="text-right">Time</span>
       </span>
     </div>
   );
@@ -42,9 +42,11 @@ export function DateTimeCell({
   }
 
   return (
-    <span className="grid min-w-[160px] grid-cols-[minmax(92px,1fr)_64px] gap-3 text-sm text-[var(--ops-text-soft)]">
+    <span className="grid min-w-[180px] grid-cols-[minmax(0,1fr)_88px] gap-4 text-sm text-[var(--ops-text-soft)]">
       <span>{formatDatePart(value)}</span>
-      <span className="text-[var(--ops-text-muted)]">{formatTimePart(value)}</span>
+      <span className="text-right text-[var(--ops-text-muted)]">
+        {formatTimePart(value)}
+      </span>
     </span>
   );
 }

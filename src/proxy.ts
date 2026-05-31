@@ -29,7 +29,7 @@ function getSafeRedirectPath(value: string | null) {
   return value;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const { envError, response, user } = await updateSession(request);
 

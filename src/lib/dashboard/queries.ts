@@ -1,3 +1,9 @@
+import { buildAuditActivityLookups, presentAuditActivity } from "@/lib/activity/presentation";
+import {
+  formatAutomationEventName,
+  getAutomationSourceLabel,
+  sanitizeAutomationErrorMessage,
+} from "@/lib/automations/presentation";
 import { createClient } from "@/lib/supabase/server";
 import { getPipelinePreviewForDashboard } from "@/lib/pipelines/queries";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
@@ -44,14 +50,20 @@ type AutomationLogRow = {
   error_message: string | null;
   id: string;
   message: string;
+  payload: Record<string, unknown> | null;
+  related_type: string;
   status: "success" | "failed" | "pending" | "skipped" | "retrying";
 };
 
 type AuditLogRow = {
   action: string;
+  actor_user_id: string | null;
   created_at: string;
+  entity_id: string | null;
   entity_type: string;
   id: string;
+  metadata: Record<string, unknown> | null;
+  workspace_id: string;
 };
 
 function startOfLocalDay(value: Date) {
@@ -139,30 +151,47 @@ function buildAgendaItems({
   );
 }
 
-function buildActivityItems({
+async function buildActivityItems({
   auditLogs,
   automationLogs,
+  supabase,
 }: {
   auditLogs: AuditLogRow[];
   automationLogs: AutomationLogRow[];
-}): DashboardActivityItem[] {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}): Promise<DashboardActivityItem[]> {
   const automationItems = automationLogs.map((log) => ({
+    category:
+      log.automation_type.includes("assigned") ||
+      log.automation_type.includes("assignment")
+        ? "Assignments"
+        : "Automation",
     created_at: log.created_at,
     id: log.id,
-    message: log.error_message ?? log.message,
+    icon: "automation",
+    message: sanitizeAutomationErrorMessage(log.error_message) ?? log.message,
+    source: getAutomationSourceLabel(log),
     status: log.status,
-    title: log.automation_type,
+    title: formatAutomationEventName(log.automation_type),
     type: "automation" as const,
   }));
 
-  const auditItems = auditLogs.map((log) => ({
-    created_at: log.created_at,
-    id: log.id,
-    message: log.entity_type,
-    status: null,
-    title: log.action,
-    type: "audit" as const,
-  }));
+  const auditLookups = await buildAuditActivityLookups(supabase, auditLogs);
+  const auditItems = auditLogs.map((log) => {
+    const presentation = presentAuditActivity(log, auditLookups);
+
+    return {
+      created_at: log.created_at,
+      id: log.id,
+      icon: presentation.icon,
+      category: presentation.category,
+      message: presentation.description,
+      source: "Audit",
+      status: null,
+      title: presentation.title,
+      type: "audit" as const,
+    };
+  });
 
   return [...automationItems, ...auditItems]
     .sort(
@@ -276,14 +305,14 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
       .returns<AppointmentRow[]>(),
     supabase
       .from("automation_logs")
-      .select("id,automation_type,status,message,error_message,created_at")
+      .select("id,automation_type,related_type,status,message,payload,error_message,created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(8)
       .returns<AutomationLogRow[]>(),
     supabase
       .from("audit_logs")
-      .select("id,action,entity_type,created_at")
+      .select("id,workspace_id,action,actor_user_id,entity_id,entity_type,metadata,created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(8)
@@ -359,9 +388,10 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
       overdueTasks,
     },
     pipeline: pipelinePreview,
-    recentActivity: buildActivityItems({
+    recentActivity: await buildActivityItems({
       auditLogs,
       automationLogs,
+      supabase,
     }),
     revenue: {
       completedActualRevenue,

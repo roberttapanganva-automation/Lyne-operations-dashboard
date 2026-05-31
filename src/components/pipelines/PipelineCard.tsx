@@ -1,14 +1,16 @@
+"use client";
+
 import { Badge } from "@/components/ui/Badge";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { formatDateTime } from "@/lib/formatting/date";
-import type { PipelineBoardCard, PipelineBoardStage } from "@/types/domain";
-import { MovePipelineCardControl } from "./MovePipelineCardControl";
+import type { PipelineBoardCard } from "@/types/domain";
+import { EditPipelineLeadDialog } from "./EditPipelineLeadDialog";
 
 type PipelineCardProps = {
   canMoveCards: boolean;
   card: PipelineBoardCard;
   currencyCode: string;
-  stageOptions: Pick<PipelineBoardStage, "id" | "name">[];
+  isMoving?: boolean;
 };
 
 function getStatusBadgeVariant(status: string) {
@@ -47,17 +49,42 @@ export function PipelineCard({
   canMoveCards,
   card,
   currencyCode,
-  stageOptions,
+  isMoving = false,
 }: PipelineCardProps) {
-  return (
-    <article className="rounded-xl border border-[var(--ops-border)] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+  const secondaryDetails =
+    card.entity_type === "lead"
+      ? [card.client?.name ?? card.client?.email, card.next_follow_up_at ? formatDateTime(card.next_follow_up_at) : null]
+      : [card.service_type, card.scheduled_start ? formatDateTime(card.scheduled_start) : null, card.location];
+
+  const cardBody = (
+    <article
+      className={`rounded-lg border border-[var(--ops-border)] bg-white/90 px-3 py-2 shadow-sm transition hover:border-[var(--workspace-primary,var(--ops-primary))] ${
+        canMoveCards ? "cursor-grab active:cursor-grabbing" : ""
+      } ${isMoving ? "opacity-60" : ""}`}
+      draggable={canMoveCards}
+      onDragStart={(event) => {
+        if (!canMoveCards) {
+          return;
+        }
+
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(
+          "application/opspilot-pipeline-card",
+          JSON.stringify({
+            entityType: card.entity_type,
+            recordId: card.id,
+            sourceStageId: card.stage_id,
+          }),
+        );
+      }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
             {card.title}
           </p>
           {card.client?.name || card.client?.email ? (
-            <p className="mt-1 truncate text-xs text-[var(--ops-text-soft)]">
+            <p className="mt-0.5 truncate text-xs text-[var(--ops-text-soft)]">
               {card.client?.name ?? card.client?.email}
               {card.client?.name && card.client?.email
                 ? ` - ${card.client?.email}`
@@ -70,7 +97,7 @@ export function PipelineCard({
         </Badge>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap gap-1.5">
         {typeof card.estimated_value === "number" ? (
           <Badge variant="default">
             {formatCurrency(card.estimated_value, currencyCode)}
@@ -88,60 +115,26 @@ export function PipelineCard({
         ) : null}
       </div>
 
-      <div className="mt-4 space-y-2 text-xs leading-5 text-[var(--ops-text-soft)]">
-        {card.entity_type === "lead" ? (
-          <>
-            {card.next_follow_up_at ? (
-              <p>
-                <span className="font-semibold text-[var(--ops-text-muted)]">
-                  Next follow-up:
-                </span>{" "}
-                {formatDateTime(card.next_follow_up_at)}
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <>
-            {card.service_type ? (
-              <p>
-                <span className="font-semibold text-[var(--ops-text-muted)]">
-                  Service:
-                </span>{" "}
-                {card.service_type}
-              </p>
-            ) : null}
-            {card.scheduled_start ? (
-              <p>
-                <span className="font-semibold text-[var(--ops-text-muted)]">
-                  Scheduled:
-                </span>{" "}
-                {formatDateTime(card.scheduled_start)}
-              </p>
-            ) : null}
-          </>
-        )}
-        {card.location ? (
-          <p>
-            <span className="font-semibold text-[var(--ops-text-muted)]">
-              Location:
-            </span>{" "}
-            {card.location}
-          </p>
-        ) : null}
-        {!card.location && !card.scheduled_start && !card.next_follow_up_at ? (
-          <p className="text-[var(--ops-text-muted)]">No schedule details yet.</p>
-        ) : null}
-      </div>
-
-      <div className="mt-4 border-t border-[var(--ops-border)] pt-3">
-        <MovePipelineCardControl
-          canMoveCards={canMoveCards}
-          currentStageId={card.stage_id}
-          entityType={card.entity_type}
-          recordId={card.id}
-          stageOptions={stageOptions}
-        />
-      </div>
+      {secondaryDetails.some(Boolean) ? (
+        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs leading-5 text-[var(--ops-text-soft)]">
+          {secondaryDetails.filter(Boolean).map((detail) => (
+            <span key={detail} className="truncate">
+              {detail}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </article>
   );
+
+  if (card.entity_type === "lead") {
+    return (
+      <EditPipelineLeadDialog
+        lead={card}
+        trigger={cardBody}
+      />
+    );
+  }
+
+  return cardBody;
 }

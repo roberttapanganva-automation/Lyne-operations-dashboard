@@ -4,6 +4,7 @@ import { ArrowRightIcon } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 import type { PipelineEntityType } from "@/types/domain";
 
@@ -80,17 +81,24 @@ export function MovePipelineCardControl({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(message ?? "We could not move the card.");
+        const nextError = message ?? "We could not move the card.";
+        setError(nextError);
+        notify.error("Pipeline update failed", nextError);
         return;
       }
 
+      notify.success(
+        "Pipeline updated",
+        "The lead was moved to the selected stage.",
+      );
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const nextError =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not move the card.",
-      );
+          : "We could not move the card.";
+      setError(nextError);
+      notify.error("Pipeline update failed", nextError);
     } finally {
       setIsMoving(false);
     }

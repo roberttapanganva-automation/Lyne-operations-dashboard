@@ -1,12 +1,25 @@
 import { FunnelSimpleIcon, UsersThreeIcon } from "@phosphor-icons/react/ssr";
 import { Card } from "@/components/ui/Card";
+import type { LeadPipelineStageOption } from "@/lib/pipelines/queries";
+import type { Client } from "@/types/domain";
 import { AddLeadDialog } from "./AddLeadDialog";
+import type { LeadListItem } from "./LeadsList";
 
 type LeadsEmptyStateProps = {
+  canAssignRecords: boolean;
   canCreateRecords: boolean;
+  clients: Client[];
+  onLeadCreated?: (lead: LeadListItem) => void;
+  stageOptions: LeadPipelineStageOption[];
 };
 
-export function LeadsEmptyState({ canCreateRecords }: LeadsEmptyStateProps) {
+export function LeadsEmptyState({
+  canAssignRecords,
+  canCreateRecords,
+  clients,
+  onLeadCreated,
+  stageOptions,
+}: LeadsEmptyStateProps) {
   return (
     <Card className="overflow-hidden">
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -15,14 +28,21 @@ export function LeadsEmptyState({ canCreateRecords }: LeadsEmptyStateProps) {
             <UsersThreeIcon aria-hidden="true" size={24} weight="duotone" />
           </div>
           <h2 className="mt-5 text-xl font-semibold tracking-normal text-[var(--ops-text)]">
-            No leads yet. Add your first lead to start tracking follow-ups.
+            No leads yet. Add your first lead to start tracking new opportunities.
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--ops-text-soft)]">
             Leads created from forms, manual entry, or future automations will
             appear here.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            {canCreateRecords ? <AddLeadDialog /> : null}
+            {canCreateRecords ? (
+              <AddLeadDialog
+                canAssignRecords={canAssignRecords}
+                clients={clients}
+                onLeadCreated={onLeadCreated}
+                stageOptions={stageOptions}
+              />
+            ) : null}
             <p className="text-sm text-[var(--ops-text-muted)]">
               {canCreateRecords
                 ? "The lead will be saved to your active workspace."

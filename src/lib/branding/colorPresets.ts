@@ -1,10 +1,11 @@
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import type { BrandingColorPreset } from "@/types/domain";
 
 export const brandingColorPresets: BrandingColorPreset[] = [
   {
-    accent_color: "#4F46E5",
-    label: "OpsPilot Purple",
-    primary_color: "#6D5DFC",
+    accent_color: DEFAULT_BRAND.accentColor,
+    label: "Lyne Purple",
+    primary_color: DEFAULT_BRAND.primaryColor,
   },
   {
     accent_color: "#3730A3",
@@ -47,8 +48,8 @@ export const brandingColorPresets: BrandingColorPreset[] = [
     primary_color: "#334155",
   },
   {
-    accent_color: "#4F46E5",
+    accent_color: DEFAULT_BRAND.accentColor,
     label: "Custom",
-    primary_color: "#6D5DFC",
+    primary_color: DEFAULT_BRAND.primaryColor,
   },
 ];

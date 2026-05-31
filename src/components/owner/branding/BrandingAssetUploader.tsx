@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ImageSquareIcon, UploadSimpleIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 
 type BrandingAssetUploaderProps = {
@@ -46,14 +47,20 @@ export function BrandingAssetUploader({
       const result = (await response.json()) as ApiResponse<UploadResponse>;
 
       if (!response.ok || !result.ok) {
-        setError(result.ok ? "Upload failed." : result.error.message);
+        const errorMessage = result.ok ? "Upload failed." : result.error.message;
+        setError(errorMessage);
+        notify.error("Upload failed", errorMessage);
         return;
       }
 
       onChange(result.data.publicUrl);
       setSuccess(`${label} uploaded.`);
+      notify.success("Upload complete", `${label} uploaded.`);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Upload failed.");
+      const errorMessage =
+        caughtError instanceof Error ? caughtError.message : "Upload failed.";
+      setError(errorMessage);
+      notify.error("Upload failed", errorMessage);
     } finally {
       setIsUploading(false);
     }

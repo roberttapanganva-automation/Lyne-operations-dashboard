@@ -1,19 +1,38 @@
+import { getClientsForActiveWorkspace } from "@/lib/clients/queries";
 import { getLeadsForActiveWorkspace } from "@/lib/leads/queries";
+import { getLeadPipelineStageOptionsForActiveWorkspace } from "@/lib/pipelines/queries";
+import { getCurrentWorkspaceMemberId } from "@/lib/assignments/queries";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
 import {
+  canAssignOperationalRecords,
   canCreateOperationalRecords,
   canDeleteOperationalRecords,
 } from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
+import { ContactsPanel } from "@/components/leads/ContactsPanel";
 import { LeadsList } from "@/components/leads/LeadsList";
-import { LeadsPageHeader } from "@/components/leads/LeadsPageHeader";
-import { LeadsToolbar } from "@/components/leads/LeadsToolbar";
 
-export default async function LeadsPage() {
+type LeadsPageProps = {
+  searchParams?: Promise<{
+    tab?: string | string[];
+  }>;
+};
+
+export default async function LeadsPage({ searchParams }: LeadsPageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const tabParam = Array.isArray(resolvedSearchParams.tab)
+    ? resolvedSearchParams.tab[0]
+    : resolvedSearchParams.tab;
+  const activeTab = tabParam === "contacts" ? "contacts" : "leads";
   const activeWorkspace = await getActiveWorkspace();
   const supabase = await createClient();
-  const leads = await getLeadsForActiveWorkspace();
+  const [leads, clients, stageOptions, currentMemberId] = await Promise.all([
+    getLeadsForActiveWorkspace(),
+    getClientsForActiveWorkspace(),
+    getLeadPipelineStageOptionsForActiveWorkspace(),
+    getCurrentWorkspaceMemberId(),
+  ]);
   const rolePermission =
     activeWorkspace.status === "ready"
       ? await getEffectiveRolePermission({
@@ -29,16 +48,33 @@ export default async function LeadsPage() {
   const canDeleteRecords =
     activeWorkspace.status === "ready" &&
     canDeleteOperationalRecords(activeWorkspace.context.role);
+  const canAssignRecords =
+    activeWorkspace.status === "ready" &&
+    canAssignOperationalRecords(activeWorkspace.context.role);
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <LeadsPageHeader canCreateRecords={canCreateRecords} />
-      <LeadsToolbar />
-      <LeadsList
-        canCreateRecords={canCreateRecords}
-        canDeleteRecords={canDeleteRecords}
-        leads={leads}
-      />
+      {activeTab === "leads" ? (
+        <>
+          <LeadsList
+            activeTab={activeTab}
+            canAssignRecords={canAssignRecords}
+            canCreateRecords={canCreateRecords}
+            canDeleteRecords={canDeleteRecords}
+            clients={clients}
+            currentMemberId={currentMemberId}
+            leads={leads}
+            stageOptions={stageOptions}
+          />
+        </>
+      ) : (
+        <ContactsPanel
+          activeTab={activeTab}
+          canCreateRecords={canCreateRecords}
+          canDeleteRecords={canDeleteRecords}
+          clients={clients}
+        />
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   getDateTimeRangeError,
   type DateTimeRangeValue,
 } from "@/components/ui/DateTimeRangePicker";
+import { notify } from "@/lib/ui/toast";
 import type { ApiResponse } from "@/types/api";
 
 type AddAppointmentDialogProps = {
@@ -64,6 +65,7 @@ export function AddAppointmentDialog({
 
     if (nextScheduleError) {
       setScheduleError(nextScheduleError);
+      notify.warning("Check the appointment schedule", nextScheduleError);
       return;
     }
 
@@ -95,22 +97,25 @@ export function AddAppointmentDialog({
       const message = getErrorMessage(result);
 
       if (!response.ok || message) {
-        setError(
-          message ?? "We could not create the appointment. Please try again.",
-        );
+        const nextError =
+          message ?? "We could not create the appointment. Please try again.";
+        setError(nextError);
+        notify.error("Appointment could not be created", nextError);
         return;
       }
 
       formRef.current?.reset();
       setSchedule({ end: null, start: null });
       setIsOpen(false);
+      notify.success("Created successfully");
       router.refresh();
     } catch (caughtError) {
-      setError(
+      const nextError =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not create the appointment. Please try again.",
-      );
+          : "We could not create the appointment. Please try again.";
+      setError(nextError);
+      notify.error("Appointment could not be created", nextError);
     } finally {
       setIsSubmitting(false);
     }
@@ -136,7 +141,7 @@ export function AddAppointmentDialog({
           role="dialog"
         >
           <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-[var(--ops-border)] bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-[var(--ops-border)] px-5 py-4 sm:px-6">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--ops-border)] bg-white/95 px-5 py-4 backdrop-blur-sm sm:px-6">
               <div className="flex gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--ops-primary-soft)] text-[var(--ops-primary-dark)]">
                   <CalendarPlusIcon
@@ -159,7 +164,7 @@ export function AddAppointmentDialog({
               </div>
               <button
                 aria-label="Close add appointment dialog"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--ops-text-soft)] transition hover:bg-[var(--ops-card-soft)] hover:text-[var(--ops-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-primary)]"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--ops-danger-soft)] bg-[var(--ops-danger-soft)]/45 text-[var(--ops-danger)] transition hover:bg-[var(--ops-danger-soft)] hover:text-[var(--ops-danger)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ops-danger)]"
                 disabled={isSubmitting}
                 onClick={closeDialog}
                 type="button"

@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell/AppShell";
 import { NoWorkspaceState } from "@/components/app-shell/NoWorkspaceState";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { updateCurrentUserLastSeen } from "@/lib/auth/lastSeen";
+import { getCurrentUserPreferences } from "@/lib/profile/preferences";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 import { getThemePreference } from "@/lib/theme/getThemePreference";
 
@@ -18,11 +19,19 @@ export default async function ProtectedAppLayout({
   }
 
   await updateCurrentUserLastSeen();
-  const themePreference = await getThemePreference(activeWorkspace.context);
+  const [preferences, themePreference] = await Promise.all([
+    getCurrentUserPreferences(),
+    getThemePreference(activeWorkspace.context),
+  ]);
 
   return (
     <ThemeProvider initialPreference={themePreference}>
-      <AppShell workspaceContext={activeWorkspace.context}>{children}</AppShell>
+      <AppShell
+        tableDensity={preferences?.table_density ?? "comfortable"}
+        workspaceContext={activeWorkspace.context}
+      >
+        {children}
+      </AppShell>
     </ThemeProvider>
   );
 }

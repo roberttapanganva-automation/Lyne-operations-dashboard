@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { triggerAutomationForWorkspace } from "@/lib/n8n/client";
 import { canManageOperations } from "@/lib/permissions/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
@@ -9,6 +10,7 @@ import type { ApiResponse } from "@/types/api";
 type StageRow = {
   entity_type: "lead" | "job";
   id: string;
+  name: string;
   pipeline_group_id: string;
   workspace_id: string;
 };
@@ -96,7 +98,7 @@ export async function PATCH(request: Request) {
     const workspaceId = activeWorkspace.context.workspace.id;
     const { data: targetStage, error: stageError } = await supabase
       .from("pipeline_stages")
-      .select("id,workspace_id,pipeline_group_id,entity_type")
+      .select("id,name,workspace_id,pipeline_group_id,entity_type")
       .eq("id", payload.target_stage_id)
       .eq("workspace_id", workspaceId)
       .maybeSingle<StageRow>();
@@ -164,6 +166,18 @@ export async function PATCH(request: Request) {
       );
     }
 
+    const previousStageName =
+      record.stage_id !== null
+        ? (
+            await supabase
+              .from("pipeline_stages")
+              .select("name")
+              .eq("id", record.stage_id)
+              .eq("workspace_id", workspaceId)
+              .maybeSingle<{ name: string }>()
+          ).data?.name ?? null
+        : null;
+
     const { data: updatedRecord, error: updateError } = await supabase
       .from(tableName)
       .update({
@@ -195,12 +209,34 @@ export async function PATCH(request: Request) {
       entity_id: payload.record_id,
       entity_type: payload.entity_type,
       metadata: {
+        from_stage_name: previousStageName,
         from_stage_id: record.stage_id,
         pipeline_group_id: targetStage.pipeline_group_id,
+        target_stage_name: targetStage.name,
         target_stage_id: payload.target_stage_id,
       },
       workspace_id: workspaceId,
     });
+
+    after(() =>
+      triggerAutomationForWorkspace({
+        automationType: "pipeline.card.moved",
+        payload: {
+          actor_user_id: user.id,
+          entity_id: payload.record_id,
+          entity_type: payload.entity_type,
+          from_stage_id: record.stage_id,
+          from_stage_name: previousStageName,
+          timestamp: new Date().toISOString(),
+          to_stage_id: payload.target_stage_id,
+          to_stage_name: targetStage.name,
+        },
+        relatedId: payload.record_id,
+        relatedType: payload.entity_type,
+        supabase,
+        workspaceId,
+      }),
+    );
 
     return jsonResponse({
       data: updatedRecord,

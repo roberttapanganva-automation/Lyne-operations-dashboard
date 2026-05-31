@@ -1,14 +1,29 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { revalidateJobPages } from "@/lib/cache/revalidate-app";
 import { ZodError } from "zod";
+import {
+  getAssignableMember,
+  getAssignmentFields,
+} from "@/lib/assignments/engine";
 import { getEffectiveRolePermission } from "@/lib/permissions/effective";
-import { canCreateOperationalRecords } from "@/lib/permissions/workspace";
+import {
+  canAssignOperationalRecords,
+  canCreateOperationalRecords,
+} from "@/lib/permissions/workspace";
+import { triggerAutomationForWorkspace } from "@/lib/n8n/client";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveWorkspace } from "@/lib/tenant/getActiveWorkspace";
 import { createJobSchema } from "@/lib/validation/jobs";
 import type { ApiResponse } from "@/types/api";
+import type { AssignableWorkspaceMember } from "@/types/domain";
 
 type JobResponse = {
+  assigned_member_id: string | null;
   client_id: string | null;
+  clients: {
+    email: string | null;
+    name: string;
+  } | null;
   created_at: string;
   estimated_value: number | string;
   id: string;
@@ -79,7 +94,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("jobs")
     .select(
-      "id,client_id,title,service_type,scheduled_start,scheduled_end,location,estimated_value,payment_status,status,created_at",
+      "id,assigned_member_id,client_id,title,service_type,scheduled_start,scheduled_end,location,estimated_value,payment_status,status,created_at,clients(name,email)",
     )
     .eq("workspace_id", activeWorkspace.context.workspace.id)
     .order("created_at", { ascending: false })
@@ -167,8 +182,45 @@ export async function POST(request: Request) {
   try {
     const payload = createJobSchema.parse(await request.json());
     const workspaceId = activeWorkspace.context.workspace.id;
+    const requestedAssignedMemberId = payload.assigned_member_id ?? null;
+    let assignedMember: AssignableWorkspaceMember | null = null;
 
     let clientId: string | null = null;
+
+    if (requestedAssignedMemberId) {
+      if (!canAssignOperationalRecords(activeWorkspace.context.role)) {
+        return jsonResponse(
+          {
+            error: {
+              code: "JOB_ASSIGN_FORBIDDEN",
+              message: "Your workspace role cannot assign jobs.",
+            },
+            ok: false,
+          },
+          403,
+        );
+      }
+
+      assignedMember = await getAssignableMember({
+        memberId: requestedAssignedMemberId,
+        supabase,
+        workspaceId,
+      });
+
+      if (!assignedMember) {
+        return jsonResponse(
+          {
+            error: {
+              code: "JOB_ASSIGNEE_INVALID",
+              message:
+                "Choose an active admin, manager, or staff member from this workspace.",
+            },
+            ok: false,
+          },
+          400,
+        );
+      }
+    }
 
     if (payload.client_name) {
       const { data: client, error: clientError } = await supabase
@@ -229,6 +281,11 @@ export async function POST(request: Request) {
       .from("jobs")
       .insert({
         actual_value: payload.actual_value ?? null,
+        ...getAssignmentFields({
+          actorUserId: user.id,
+          assignedMember,
+          targetType: "job",
+        }),
         client_id: clientId,
         created_by: user.id,
         estimated_value: payload.estimated_value,
@@ -245,7 +302,7 @@ export async function POST(request: Request) {
         workspace_id: workspaceId,
       })
       .select(
-        "id,client_id,title,service_type,scheduled_start,scheduled_end,location,estimated_value,payment_status,status,created_at",
+        "id,assigned_member_id,client_id,title,service_type,scheduled_start,scheduled_end,location,estimated_value,payment_status,status,created_at,clients(name,email)",
       )
       .single<JobResponse>();
 
@@ -274,9 +331,29 @@ export async function POST(request: Request) {
       workspace_id: workspaceId,
     });
 
+    revalidateJobPages();
+
+    if (assignedMember) {
+      after(() =>
+        triggerAutomationForWorkspace({
+          automationType: "job.assigned",
+          payload: {
+            assigned_member_id: assignedMember.id,
+          },
+          relatedId: job.id,
+          relatedType: "job",
+          supabase,
+          workspaceId,
+        }),
+      );
+    }
+
     return jsonResponse(
       {
-        data: job,
+        data: {
+          ...job,
+          assigned_member: assignedMember,
+        },
         ok: true,
       },
       201,

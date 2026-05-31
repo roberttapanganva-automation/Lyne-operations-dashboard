@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_BRAND } from "@/lib/branding/defaults";
 import { hexColorSchema } from "@/lib/validation/branding";
 
 const optionalText = z.preprocess(
@@ -29,8 +30,8 @@ export const updatePipelineGroupSchema = z.object({
 });
 
 export const createPipelineStageSchema = z.object({
-  color: hexColorSchema.default("#6D5DFC"),
-  entity_type: pipelineEntityTypeSchema,
+  color: hexColorSchema.default(DEFAULT_BRAND.primaryColor),
+  entity_type: pipelineEntityTypeSchema.optional(),
   is_closed: z.boolean().default(false),
   is_lost: z.boolean().default(false),
   is_won: z.boolean().default(false),

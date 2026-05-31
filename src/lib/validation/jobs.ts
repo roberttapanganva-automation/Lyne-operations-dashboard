@@ -48,8 +48,15 @@ const optionalDateTime = z.preprocess((value) => {
   return value;
 }, z.string().refine((value) => !Number.isNaN(Date.parse(value)), "Enter a valid schedule date.").optional());
 
+const optionalNullableUuid = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? null : value,
+  z.uuid().nullable().optional(),
+);
+
 export const createJobSchema = z.object({
   actual_value: optionalNullableNumber,
+  assigned_member_id: optionalNullableUuid,
   client_email: optionalEmail,
   client_name: optionalText,
   client_phone: optionalText,
@@ -69,4 +76,25 @@ export const createJobSchema = z.object({
   title: z.string().trim().min(1, "Job title is required."),
 });
 
+export const updateJobSchema = z.object({
+  assigned_member_id: optionalNullableUuid,
+  estimated_value: optionalNumber.default(0),
+  location: optionalText,
+  payment_status: z
+    .enum(["unpaid", "partial", "paid", "refunded", "not_applicable"])
+    .default("unpaid"),
+  service_type: optionalText,
+  status: z
+    .enum(["draft", "scheduled", "in_progress", "completed", "cancelled"])
+    .default("scheduled"),
+  title: z.string().trim().min(1, "Job title is required."),
+});
+
+export const bulkJobActionSchema = z.object({
+  action: z.literal("delete"),
+  ids: z.array(z.uuid()).min(1).max(200),
+});
+
+export type BulkJobActionInput = z.infer<typeof bulkJobActionSchema>;
 export type CreateJobInput = z.infer<typeof createJobSchema>;
+export type UpdateJobInput = z.infer<typeof updateJobSchema>;
